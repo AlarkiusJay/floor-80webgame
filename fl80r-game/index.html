@@ -5,22 +5,84 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Floor 80</title>
-    <meta name="description" content="Floor 80 — a browser puzzle game. Climb the floors, solve each one." />
+    <meta name="theme-color" content="#010101" />
 
-    <!-- Social preview -->
-    <meta property="og:title" content="Floor 80" />
-    <meta property="og:description" content="A browser puzzle game. Climb the floors, solve each one." />
+    <title>FL80R - A Puzzle & Logic Game</title>
+    <meta
+      name="description"
+      content="FL80R is a free browser puzzle game. Climb an 80-floor building one puzzle at a time: riddles, math, hidden text, chases, and bosses. No saves, no checkpoints, fresh riddles every run."
+    />
+    <meta
+      name="keywords"
+      content="FL80R, Floor 80, puzzle game, browser game, logic game, riddle game, online puzzle, free web game, streamer game"
+    />
+    <link rel="canonical" href="https://www.fl80r.party/" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content="FL80R" />
+    <meta property="og:title" content="FL80R - A Puzzle & Logic Game" />
+    <meta
+      property="og:description"
+      content="Climb an 80-floor building one puzzle at a time. No saves, no checkpoints, fresh riddles every run. Play free in your browser."
+    />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.fl80r.party" />
+    <meta property="og:url" content="https://www.fl80r.party/" />
     <meta property="og:image" content="https://www.fl80r.party/favicon.png" />
+    <meta property="og:image:width" content="700" />
+    <meta property="og:image:height" content="700" />
+    <meta property="og:image:alt" content="FL80R logo" />
+
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Floor 80" />
-    <meta name="twitter:description" content="A browser puzzle game. Climb the floors, solve each one." />
+    <meta name="twitter:title" content="FL80R - A Puzzle & Logic Game" />
+    <meta
+      name="twitter:description"
+      content="Climb an 80-floor building one puzzle at a time. No saves, no checkpoints, fresh riddles every run. Play free in your browser."
+    />
     <meta name="twitter:image" content="https://www.fl80r.party/favicon.png" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "FL80R",
+        "alternateName": "Floor 80",
+        "url": "https://www.fl80r.party/",
+        "image": "https://www.fl80r.party/favicon.png",
+        "description": "FL80R is a free browser puzzle game. Climb an 80-floor building one puzzle at a time: riddles, math, hidden text, chases, and bosses. No saves, no checkpoints, fresh riddles every run.",
+        "genre": ["Puzzle", "Logic"],
+        "gamePlatform": "Web browser",
+        "applicationCategory": "Game",
+        "operatingSystem": "Any (web browser)",
+        "playMode": "SinglePlayer",
+        "inLanguage": "en",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Crawlable fallback for search engines and no-JS visitors. Replaced by the app on load. -->
+      <noscript>
+        <main style="max-width: 40rem; margin: 3rem auto; padding: 0 1rem; font-family: monospace; color: #d0d0d0; background: #010101;">
+          <h1>FL80R - A Puzzle &amp; Logic Game</h1>
+          <p><strong>80 floors. No saves. No checkpoints. No mercy.</strong></p>
+          <p>
+            FL80R (Floor 80) is a free browser puzzle game. You start partway up
+            an 80-floor building and solve your way to the top: riddles, math,
+            hidden text, chases, and bosses. Every new run generates a fresh set
+            of puzzles.
+          </p>
+          <p>FL80R needs JavaScript enabled to play. Please enable JavaScript and reload.</p>
+        </main>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

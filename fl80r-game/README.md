@@ -1,8 +1,8 @@
-# FL80R — app
+# FL80R App
 
 The FL80R game application. For an overview of the game itself, see the [root README](../README.md).
 
-Built with **Vite + React + Tailwind CSS**. Fully client-side — no backend or accounts.
+Built with **Vite + React + Tailwind CSS**. Fully client-side, with no backend or accounts.
 
 ## Prerequisites
 
@@ -47,5 +47,5 @@ npx wrangler deploy
 ```
 
 SPA routing (deep links and refreshes resolving to the app) is handled by
-`not_found_handling: "single-page-application"` in `wrangler.jsonc` — the
+`not_found_handling: "single-page-application"` in `wrangler.jsonc`, the
 Workers equivalent of a `/* -> /index.html` fallback.

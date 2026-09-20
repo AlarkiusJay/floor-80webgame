@@ -92,7 +92,7 @@ export default function IntroScreen({ onStart }) {
           >
             <span style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 16px hsl(158 64% 52% / 0.6), 0 0 40px hsl(158 64% 52% / 0.2)" }}>About </span>
             <span style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 16px hsl(158 64% 52% / 0.6), 0 0 40px hsl(158 64% 52% / 0.2)" }}>FL</span>
-            <span style={{ color: "hsl(0 72% 51%)", textShadow: "0 0 14px hsl(0 72% 51% / 0.7), 0 0 40px hsl(0 72% 51% / 0.25)" }}>80</span>
+            <span style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 16px hsl(158 64% 52% / 0.6), 0 0 40px hsl(158 64% 52% / 0.2)" }}>80</span>
             <span style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 16px hsl(158 64% 52% / 0.6), 0 0 40px hsl(158 64% 52% / 0.2)" }}>R</span>
           </motion.p>
         </motion.div>

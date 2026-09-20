@@ -1,13 +1,5 @@
 <img width="1014" height="376" alt="srcnsht-png-02-39_2" src="https://github.com/user-attachments/assets/5c6878a7-3489-4684-b3fc-337c6145eb50" />
 
----
-
-<img width="541" height="708" alt="srcnsht-png-02-39_1" src="https://github.com/user-attachments/assets/1e6c8a86-749f-4c4e-9bf5-05d052f1b8a1" />
-
-<div align="center">
-
-# FL80R
-
 **80 floors. No saves. No checkpoints. No mercy.**
 
 A browser-based puzzle-logic game. Climb a mysterious building one floor at a time — every floor is its own puzzle, and it won't let you go back.

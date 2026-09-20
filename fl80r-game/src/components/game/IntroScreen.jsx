@@ -91,9 +91,9 @@ export default function IntroScreen({ onStart }) {
             transition={{ duration: 0.15, repeat: Infinity, repeatDelay: 3.5, ease: "easeInOut" }}
           >
             <span style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 16px hsl(158 64% 52% / 0.6), 0 0 40px hsl(158 64% 52% / 0.2)" }}>About </span>
-            <span style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 16px hsl(158 64% 52% / 0.6), 0 0 40px hsl(158 64% 52% / 0.2)" }}>FL</span>
-            <span style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 16px hsl(158 64% 52% / 0.6), 0 0 40px hsl(158 64% 52% / 0.2)" }}>80</span>
-            <span style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 16px hsl(158 64% 52% / 0.6), 0 0 40px hsl(158 64% 52% / 0.2)" }}>R</span>
+            <span style={{ color: "#ffffff", textShadow: "0 0 12px rgba(255,255,255,0.45), 0 0 34px rgba(255,255,255,0.18)" }}>FL</span>
+            <span style={{ color: "#16ff0e", textShadow: "0 0 16px rgba(22,255,14,0.65), 0 0 40px rgba(22,255,14,0.3)" }}>80</span>
+            <span style={{ color: "#ffffff", textShadow: "0 0 12px rgba(255,255,255,0.45), 0 0 34px rgba(255,255,255,0.18)" }}>R</span>
           </motion.p>
         </motion.div>
 

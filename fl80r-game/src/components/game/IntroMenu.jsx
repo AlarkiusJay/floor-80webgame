@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, Cat, Star, X, Coffee } from "lucide-react";
+import { Settings, Cat, Star, X, Coffee, Github } from "lucide-react";
 
 const KOFI_URL = "https://ko-fi.com/alarkiusej/tiers";
+const ISSUES_URL = "https://github.com/AlarkiusJay/floor-80webgame/issues";
 
 // Add Meowspporter names here as they support — e.g. ["Ada", "Mochi the Cat"]
 const CONTRIBUTORS = [];
@@ -137,6 +138,19 @@ export default function IntroMenu() {
                   🎵 Music is coming soon! Check back later!
                 </p>
               </div>
+
+              <a
+                href={ISSUES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded border border-primary/25 bg-black/30 px-3 py-2.5 text-primary/70 hover:text-primary hover:border-primary/60 hover:bg-primary/5 transition-all"
+              >
+                <Github size={18} className="shrink-0" />
+                <span className="text-xs leading-relaxed">
+                  See a bug or issue? Or want to request a feature? Report to us
+                  on GitHub!
+                </span>
+              </a>
             </div>
           </Panel>
         )}

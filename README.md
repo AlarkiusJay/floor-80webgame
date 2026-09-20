@@ -1,42 +1,16 @@
-# Floor 80
+# floor-80webgame
 
-A browser-based puzzle game. Climb the floors — each one is a different challenge (typed answers, math, circuits, chases, riddles, a cat boss, and more) until you reach the top.
+The game lives in [`fl80r-game/`](./fl80r-game). See its [README](./fl80r-game/README.md) to run it locally.
 
-Built with **Vite + React + Tailwind CSS**.
+## Deploying with Cloudflare Pages
 
-## Getting started
+Point Cloudflare Pages at this repo and use these build settings:
 
-**Prerequisites:** [Node.js](https://nodejs.org/) 18+ and npm.
+| Setting                  | Value          |
+| ------------------------ | -------------- |
+| **Root directory**       | `fl80r-game`   |
+| **Framework preset**     | Vite           |
+| **Build command**        | `npm run build`|
+| **Build output directory** | `dist`       |
 
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Start the dev server
-npm run dev
-```
-
-Then open the URL Vite prints (default: http://localhost:5173).
-
-## Scripts
-
-| Command           | Description                            |
-| ----------------- | -------------------------------------- |
-| `npm run dev`     | Start the local dev server             |
-| `npm run build`   | Build for production into `dist/`      |
-| `npm run preview` | Preview the production build locally   |
-| `npm run lint`    | Run ESLint                             |
-
-## Deploying
-
-`npm run build` produces a static site in `dist/` that can be hosted on any static host (GitHub Pages, Netlify, Vercel, Cloudflare Pages, etc.).
-
-## Project structure
-
-```
-src/
-  pages/Game.jsx          # Top-level game state machine (intro → playing → win)
-  components/game/         # One component per floor type
-  data/                    # Floor generation, riddles, word lists
-  components/ui/           # Reusable UI primitives
-```
+Client-side routing is handled by `fl80r-game/public/_redirects` (`/* → /index.html 200`), so deep links and refreshes resolve correctly.

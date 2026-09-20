@@ -151,6 +151,10 @@ export default function IntroMenu() {
                   on GitHub!
                 </span>
               </a>
+
+              <p className="pt-1 text-center text-[10px] tracking-widest uppercase text-muted-foreground/70">
+                FL80R by Alarkius Elvya Jay
+              </p>
             </div>
           </Panel>
         )}

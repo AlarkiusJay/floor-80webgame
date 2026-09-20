@@ -18,6 +18,10 @@ A browser-based puzzle-logic game. Climb a mysterious building one floor at a ti
 
 ---
 
+All Creative Control Direction (Functions & Features) is made by Me. Claude Code simply helps with the logic and structure.
+
+---
+
 ## What is FL80R?
 
 FL80R (*"Floor 80"*) drops you partway up an 80-storey building and dares you to reach the top. Each floor is a self-contained challenge — a riddle, a bit of math, something hidden in plain sight, a chase, a boss. Solve it to climb. There are no saves and no checkpoints: it's one continuous run to the top.

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // SVG heartbeat/EKG path that loops forever
@@ -40,18 +40,31 @@ function HeartbeatLine() {
 
 export default function OpeningIntro({ onDone }) {
   const [phase, setPhase] = useState("waiting"); // waiting | done
+  const startedRef = useRef(false);
 
-  const handleClick = () => {
-    if (phase !== "waiting") return;
+  const advance = () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
     setPhase("done");
     setTimeout(() => onDone(), 600);
   };
 
+  // Continue on Enter
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        advance();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   return (
     <motion.div
-      className="fixed inset-0 flex flex-col items-center justify-center cursor-pointer select-none"
+      className="fixed inset-0 flex flex-col items-center justify-center select-none"
       style={{ backgroundColor: "#010101", zIndex: 100 }}
-      onClick={handleClick}
       animate={{ opacity: phase === "done" ? 0 : 1 }}
       transition={{ duration: 0.6, ease: "easeInOut" }}
     >
@@ -98,19 +111,31 @@ export default function OpeningIntro({ onDone }) {
         </div>
       </div>
 
-      {/* Click prompt */}
+      {/* Continue prompt */}
       <AnimatePresence>
         {phase === "waiting" && (
-          <motion.p
+          <motion.div
             key="prompt"
-            className="absolute bottom-12 font-mono-game text-xs tracking-[0.3em] uppercase"
+            className="absolute bottom-12 flex items-center gap-2.5 font-mono-game text-xs tracking-[0.3em] uppercase"
             style={{ color: "hsl(158 64% 52% / 0.45)" }}
             animate={{ opacity: [0.4, 1, 0.4] }}
             transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
             exit={{ opacity: 0 }}
           >
-            click anywhere to begin
-          </motion.p>
+            <span>Press</span>
+            <kbd
+              className="not-italic normal-case px-2 py-0.5 rounded border leading-none"
+              style={{
+                borderColor: "hsl(158 64% 52% / 0.5)",
+                color: "hsl(158 64% 52%)",
+                boxShadow: "0 0 8px hsl(158 64% 52% / 0.2), inset 0 0 6px hsl(158 64% 52% / 0.08)",
+                textShadow: "0 0 8px hsl(158 64% 52% / 0.5)",
+              }}
+            >
+              Enter&nbsp;&#9166;
+            </kbd>
+            <span>to continue</span>
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.div>

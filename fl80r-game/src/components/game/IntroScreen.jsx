@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, useAnimation } from "framer-motion";
 import OpeningIntro from "@/components/game/OpeningIntro";
+import IntroMenu from "@/components/game/IntroMenu";
 
 // Typewriter hook — loops forever, slow
 function useTypewriter(text, speed = 80, pauseMs = 2500) {
@@ -46,6 +47,9 @@ export default function IntroScreen({ onStart }) {
 
   return (
     <div className="min-h-screen bg-[#010101] flex flex-col items-center justify-center relative overflow-x-hidden scanlines py-4 sm:py-0">
+      {/* Top-right menu: Settings / Donate / Credits */}
+      <IntroMenu />
+
       {/* Green ambient screen glow */}
       <div
         className="absolute inset-0 pointer-events-none"

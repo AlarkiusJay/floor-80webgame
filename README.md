@@ -55,23 +55,6 @@ Eight zones, ten floors each, each with its own mood and color palette:
 - **Boss:** a fixed showdown every tenth floor.
 - **Floor 80:** the fixed finale at the top.
 
-## Tech
-
-A fully client-side static site with no backend, no accounts, and no tracking. Built with **Vite**, **React**, and **Tailwind CSS**.
-
-## Development & deployment
-
-The app lives in [`fl80r-game/`](./fl80r-game). See its [README](./fl80r-game/README.md) for the full run/build/deploy details. In short:
-
-```bash
-cd fl80r-game
-npm install
-npm run dev      # local dev server
-npm run build    # production build into dist/
-```
-
-It deploys as a **Cloudflare Worker with static assets** (config in [`fl80r-game/wrangler.jsonc`](./fl80r-game/wrangler.jsonc)). SPA routing is handled by `not_found_handling: "single-page-application"`.
-
 ## License
 
 See [LICENSE](./LICENSE).

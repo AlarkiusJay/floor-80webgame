@@ -20,8 +20,9 @@ export default function HiddenFloor({ floor, floorData, onAdvance }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const normalized = input.trim().toLowerCase();
-    const correct = floorData.hiddenText.trim().toLowerCase();
+    const norm = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
+    const normalized = norm(input);
+    const correct = norm(floorData.hiddenText);
     if (normalized === correct) {
       setStatus("correct");
       setTimeout(() => onAdvance(floorData.nextFloor), 900);
@@ -100,7 +101,7 @@ export default function HiddenFloor({ floor, floorData, onAdvance }) {
               {/* Revealed message display */}
               <div className="border border-primary/30 rounded-md px-4 py-2 bg-primary/5">
                 <p className="text-[10px] text-primary/50 font-mono-game tracking-widest uppercase mb-1">
-                  ✓ Message found — now type it exactly
+                  ✓ Message found. Now type it exactly
                 </p>
                 <p
                   className="font-mono-game text-sm glow-green"
@@ -142,7 +143,7 @@ export default function HiddenFloor({ floor, floorData, onAdvance }) {
 
                 {attempts >= 3 && (
                   <p className="text-muted-foreground/30 font-mono-game text-xs">
-                    Hint: copy it exactly, including punctuation and arrows.
+                    Hint: type it exactly as shown, letter for letter.
                   </p>
                 )}
               </form>
@@ -159,7 +160,7 @@ export default function HiddenFloor({ floor, floorData, onAdvance }) {
             animate={{ opacity: 1 }}
             className="absolute inset-0 flex items-center justify-center text-primary glow-green font-vt323 text-3xl tracking-widest pointer-events-none z-40"
           >
-            CONFIRMED — ADVANCING...
+            CONFIRMED. ADVANCING...
           </motion.p>
         )}
       </AnimatePresence>

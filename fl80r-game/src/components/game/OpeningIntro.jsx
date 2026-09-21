@@ -38,18 +38,83 @@ function HeartbeatLine() {
   );
 }
 
+// Circular hold-to-continue progress ring
+function HoldRing({ progress, active }) {
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  return (
+    <span
+      className="relative inline-flex items-center justify-center"
+      style={{ width: 40, height: 40 }}
+    >
+      {/* Idle breathing glow */}
+      <motion.span
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          width: 32,
+          height: 32,
+          border: "1px solid hsl(158 64% 52% / 0.25)",
+          boxShadow: "0 0 10px hsl(158 64% 52% / 0.4)",
+        }}
+        animate={
+          active
+            ? { scale: 1, opacity: 1 }
+            : { scale: [1, 1.12, 1], opacity: [0.45, 0.9, 0.45] }
+        }
+        transition={
+          active
+            ? { duration: 0.2 }
+            : { duration: 2, repeat: Infinity, ease: "easeInOut" }
+        }
+      />
+      <svg width="40" height="40" viewBox="0 0 40 40" className="relative -rotate-90">
+        <circle
+          cx="20"
+          cy="20"
+          r={r}
+          fill="none"
+          stroke="hsl(158 64% 52% / 0.2)"
+          strokeWidth="2.5"
+        />
+        <circle
+          cx="20"
+          cy="20"
+          r={r}
+          fill="none"
+          stroke="hsl(158 64% 52%)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - progress)}
+          style={{
+            filter: "drop-shadow(0 0 5px hsl(158 64% 52% / 0.8))",
+            transition: active ? "none" : "stroke-dashoffset 0.3s ease",
+          }}
+        />
+      </svg>
+    </span>
+  );
+}
+
+const HOLD_MS = 900;
+
 export default function OpeningIntro({ onDone }) {
   const [phase, setPhase] = useState("waiting"); // waiting | done
+  const [holding, setHolding] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
   const startedRef = useRef(false);
+  const rafRef = useRef(0);
+  const holdStartRef = useRef(0);
 
   const advance = () => {
     if (startedRef.current) return;
     startedRef.current = true;
+    cancelAnimationFrame(rafRef.current);
     setPhase("done");
     setTimeout(() => onDone(), 600);
   };
 
-  // Continue on Enter
+  // Continue on Enter (desktop)
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.key === "Enter") {
@@ -61,10 +126,47 @@ export default function OpeningIntro({ onDone }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Hold anywhere to continue (touch + mouse)
+  const tick = (now) => {
+    const p = Math.min((now - holdStartRef.current) / HOLD_MS, 1);
+    setHoldProgress(p);
+    if (p >= 1) {
+      advance();
+      return;
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  };
+
+  const startHold = () => {
+    if (startedRef.current) return;
+    setHolding(true);
+    holdStartRef.current = performance.now();
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(tick);
+  };
+
+  const endHold = () => {
+    if (startedRef.current) return;
+    cancelAnimationFrame(rafRef.current);
+    setHolding(false);
+    setHoldProgress(0);
+  };
+
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+
   return (
     <motion.div
       className="fixed inset-0 flex flex-col items-center justify-center select-none"
-      style={{ backgroundColor: "#010101", zIndex: 100 }}
+      style={{
+        backgroundColor: "#010101",
+        zIndex: 100,
+        touchAction: "none",
+        WebkitTapHighlightColor: "transparent",
+      }}
+      onPointerDown={startHold}
+      onPointerUp={endHold}
+      onPointerLeave={endHold}
+      onPointerCancel={endHold}
       animate={{ opacity: phase === "done" ? 0 : 1 }}
       transition={{ duration: 0.6, ease: "easeInOut" }}
     >
@@ -116,25 +218,35 @@ export default function OpeningIntro({ onDone }) {
         {phase === "waiting" && (
           <motion.div
             key="prompt"
-            className="absolute bottom-12 flex items-center gap-2.5 font-mono-game text-xs tracking-[0.3em] uppercase"
+            className="absolute bottom-10 sm:bottom-12 flex flex-col items-center gap-4 font-mono-game text-xs tracking-[0.3em] uppercase"
             style={{ color: "hsl(158 64% 52% / 0.45)" }}
-            animate={{ opacity: [0.4, 1, 0.4] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
           >
-            <span>Press</span>
-            <kbd
-              className="not-italic normal-case px-2 py-0.5 rounded border leading-none"
-              style={{
-                borderColor: "hsl(158 64% 52% / 0.5)",
-                color: "hsl(158 64% 52%)",
-                boxShadow: "0 0 8px hsl(158 64% 52% / 0.2), inset 0 0 6px hsl(158 64% 52% / 0.08)",
-                textShadow: "0 0 8px hsl(158 64% 52% / 0.5)",
-              }}
-            >
-              Enter&nbsp;&#9166;
-            </kbd>
-            <span>to continue</span>
+            {/* Desktop: press Enter */}
+            <div className="hidden sm:flex items-center gap-2.5">
+              <span>Press</span>
+              <kbd
+                className="not-italic normal-case px-2 py-0.5 rounded border leading-none"
+                style={{
+                  borderColor: "hsl(158 64% 52% / 0.5)",
+                  color: "hsl(158 64% 52%)",
+                  boxShadow: "0 0 8px hsl(158 64% 52% / 0.2), inset 0 0 6px hsl(158 64% 52% / 0.08)",
+                  textShadow: "0 0 8px hsl(158 64% 52% / 0.5)",
+                }}
+              >
+                Enter&nbsp;&#9166;
+              </kbd>
+              <span>to continue</span>
+            </div>
+
+            {/* Everywhere: hold anywhere */}
+            <div className="flex items-center gap-3">
+              <HoldRing progress={holdProgress} active={holding} />
+              <span>Hold anywhere to continue</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

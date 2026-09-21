@@ -14,78 +14,51 @@
     <script>
       const GREEN = "#16ff0e";
 
-      function isoPt(x, y, z, s, ox, oy) {
-        const cos = Math.cos(Math.PI / 6), sin = Math.sin(Math.PI / 6);
-        return {
-          x: ox + (x - y) * cos * s,
-          y: oy + (x + y) * sin * s - z * s,
+      function background(ctx, W, H) {
+        ctx.fillStyle = "#04070a";
+        ctx.fillRect(0, 0, W, H);
+        const g = ctx.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, W * 0.6);
+        g.addColorStop(0, "rgba(22,255,14,0.10)");
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = "rgba(26,158,110,0.10)";
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= W; x += 48) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+        for (let y = 0; y <= H; y += 48) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+        const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, W * 0.75);
+        v.addColorStop(0, "rgba(0,0,0,0)");
+        v.addColorStop(1, "rgba(0,0,0,0.5)");
+        ctx.fillStyle = v;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // Flat 2D side-profile staircase line, descending left to right,
+      // with a wide landing in the middle where the wordmark rests.
+      function drawStairLine(ctx, pts) {
+        const trace = () => {
+          ctx.beginPath();
+          pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
         };
-      }
-
-      // Impossible (Penrose) staircase: solid neon step-blocks around a
-      // square loop, each a little higher than the last.
-      function facePath(ctx, pts) {
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.closePath();
-      }
-
-      function drawStairs(ctx, ox, oy, s, opacity) {
-        const L = 4;          // steps per side
-        const riseZ = 0.32;   // rise per step (low so the loop stays compact)
-        const T = 1.5;        // block thickness (tall enough to read as a step)
-
-        // Footprint cells clockwise around a square ring (no duplicate corners).
-        const cells = [];
-        for (let x = 0; x < L; x++) cells.push([x, 0]);
-        for (let y = 0; y < L; y++) cells.push([L, y]);
-        for (let x = L; x > 0; x--) cells.push([x, L]);
-        for (let y = L; y > 0; y--) cells.push([0, y]);
-
-        // Center the footprint around the origin.
-        const mid = L / 2;
         ctx.save();
-        ctx.globalAlpha = opacity;
+        ctx.strokeStyle = GREEN;
+        ctx.shadowColor = GREEN;
         ctx.lineJoin = "round";
-
-        cells.forEach(([cx0, cy0], i) => {
-          const cx = cx0 - mid, cy = cy0 - mid;
-          const zTop = i * riseZ + T;
-          const zBot = i * riseZ;
-
-          const P = (x, y, z) => isoPt(x, y, z, s, ox, oy);
-          // top face
-          const t = [P(cx, cy, zTop), P(cx + 1, cy, zTop), P(cx + 1, cy + 1, zTop), P(cx, cy + 1, zTop)];
-          // right face (x+1 plane)
-          const r = [P(cx + 1, cy, zTop), P(cx + 1, cy + 1, zTop), P(cx + 1, cy + 1, zBot), P(cx + 1, cy, zBot)];
-          // left/front face (y+1 plane)
-          const l = [P(cx, cy + 1, zTop), P(cx + 1, cy + 1, zTop), P(cx + 1, cy + 1, zBot), P(cx, cy + 1, zBot)];
-
-          ctx.shadowBlur = 0;
-          facePath(ctx, l); ctx.fillStyle = "rgba(6,40,6,0.92)"; ctx.fill();
-          facePath(ctx, r); ctx.fillStyle = "rgba(10,70,10,0.92)"; ctx.fill();
-          facePath(ctx, t); ctx.fillStyle = "rgba(16,120,16,0.55)"; ctx.fill();
-
-          ctx.strokeStyle = GREEN;
-          ctx.shadowColor = GREEN;
-          ctx.shadowBlur = 10;
-          ctx.lineWidth = 2;
-          facePath(ctx, l); ctx.stroke();
-          facePath(ctx, r); ctx.stroke();
-          facePath(ctx, t); ctx.stroke();
-        });
+        ctx.lineCap = "round";
+        // outer glow
+        ctx.lineWidth = 7; ctx.shadowBlur = 24; trace(); ctx.stroke();
+        // inner bright core
+        ctx.lineWidth = 3.2; ctx.shadowBlur = 10; trace(); ctx.stroke();
         ctx.restore();
       }
 
-      function drawWordmark(ctx, cx, cy) {
-        // Condensed VT323 like the game (scaleX 0.62)
-        const size = 190;
+      function drawWordmark(ctx, cx, baseY) {
+        const size = 116;
         ctx.save();
-        ctx.translate(cx, cy);
+        ctx.translate(cx, baseY);
         ctx.scale(0.62, 1);
         ctx.font = `${size}px VT323, monospace`;
-        ctx.textBaseline = "middle";
+        ctx.textBaseline = "alphabetic";
         ctx.textAlign = "left";
         const parts = [
           { t: "FL", c: "#ffffff" },
@@ -97,66 +70,50 @@
         for (const p of parts) {
           ctx.fillStyle = p.c;
           ctx.shadowColor = p.c === GREEN ? GREEN : "#ffffff";
-          ctx.shadowBlur = p.c === GREEN ? 34 : 22;
+          ctx.shadowBlur = p.c === GREEN ? 30 : 20;
           ctx.fillText(p.t, x, 0);
-          // second pass for stronger glow
-          ctx.shadowBlur = p.c === GREEN ? 18 : 12;
+          ctx.shadowBlur = p.c === GREEN ? 16 : 10;
           ctx.fillText(p.t, x, 0);
           x += ctx.measureText(p.t).width;
         }
         ctx.restore();
       }
 
-      function drawSubtitle(ctx, cx, cy) {
+      function drawSubtitle(ctx, cx, baseY) {
         ctx.save();
-        ctx.font = "34px 'Share Tech Mono', monospace";
+        ctx.font = "32px 'Share Tech Mono', monospace";
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.letterSpacing = "12px";
+        ctx.textBaseline = "alphabetic";
+        ctx.letterSpacing = "11px";
         ctx.fillStyle = GREEN;
         ctx.shadowColor = GREEN;
-        ctx.shadowBlur = 22;
-        ctx.fillText("PUZZLE & LOGIC GAME", cx + 6, cy); // +6 to visually center with letter-spacing
-        ctx.shadowBlur = 10;
-        ctx.fillText("PUZZLE & LOGIC GAME", cx + 6, cy);
+        ctx.shadowBlur = 20;
+        ctx.fillText("PUZZLE & LOGIC GAME", cx + 6, baseY);
+        ctx.shadowBlur = 9;
+        ctx.fillText("PUZZLE & LOGIC GAME", cx + 6, baseY);
         ctx.restore();
       }
 
-      function background(ctx, W, H) {
-        ctx.fillStyle = "#04070a";
-        ctx.fillRect(0, 0, W, H);
-        // radial green glow
-        const g = ctx.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, W * 0.6);
-        g.addColorStop(0, "rgba(22,255,14,0.10)");
-        g.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, W, H);
-        // grid
-        ctx.strokeStyle = "rgba(26,158,110,0.10)";
-        ctx.lineWidth = 1;
-        for (let x = 0; x <= W; x += 48) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-        for (let y = 0; y <= H; y += 48) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-        // vignette
-        const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, W * 0.75);
-        v.addColorStop(0, "rgba(0,0,0,0)");
-        v.addColorStop(1, "rgba(0,0,0,0.55)");
-        ctx.fillStyle = v;
-        ctx.fillRect(0, 0, W, H);
-      }
-
       window.renderOG = async function () {
-        await document.fonts.load("190px VT323");
-        await document.fonts.load("34px 'Share Tech Mono'");
+        await document.fonts.load("116px VT323");
+        await document.fonts.load("32px 'Share Tech Mono'");
         await document.fonts.ready;
         const cv = document.getElementById("c");
         const ctx = cv.getContext("2d");
         const W = cv.width, H = cv.height;
         background(ctx, W, H);
-        // Single impossible staircase as a feature on the right.
-        drawStairs(ctx, W - 300, H / 2 + 60, 33, 0.95);
-        // Wordmark + subtitle on the left-center.
-        drawWordmark(ctx, 430, H / 2 - 34);
-        drawSubtitle(ctx, 430, H / 2 + 74);
+
+        // Descending staircase across the whole banner.
+        const pts = [
+          [0, 190], [120, 190], [120, 232], [220, 232], [220, 274], [320, 274], [320, 316],
+          [885, 316],                 // wide landing (wordmark + subtitle clear it)
+          [885, 364], [992, 364], [992, 412], [1099, 412], [1099, 460], [1200, 460],
+        ];
+        drawStairLine(ctx, pts);
+
+        // Wordmark sits on the landing; subtitle floats just below.
+        drawWordmark(ctx, 545, 312);
+        drawSubtitle(ctx, 545, 370);
         return cv.toDataURL("image/png");
       };
     </script>

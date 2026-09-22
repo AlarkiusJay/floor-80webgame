@@ -68,24 +68,38 @@ export function setMusicVolume(pct) {
 // pointer/key interaction.
 export function playTheme() {
   const a = ensureAudio();
+  a.loop = true;
   a.volume = readVolume();
+  a.muted = readMuted();
 
   clearGesture();
 
-  // Retry on the first user gesture if autoplay is blocked.
+  // On the first user interaction, play with the user's real mute setting.
   const onGesture = () => {
+    a.muted = readMuted();
     a.play().then(clearGesture).catch(() => {});
   };
   window.addEventListener("pointerdown", onGesture);
   window.addEventListener("keydown", onGesture);
+  window.addEventListener("touchstart", onGesture);
   gestureCleanup = () => {
     window.removeEventListener("pointerdown", onGesture);
     window.removeEventListener("keydown", onGesture);
+    window.removeEventListener("touchstart", onGesture);
     gestureCleanup = null;
   };
 
-  // Try immediately (works if a gesture already happened).
-  a.play().then(clearGesture).catch(() => {});
+  // Autostart: try to play immediately. If the browser blocks audible
+  // autoplay, fall back to muted autoplay (allowed everywhere) so the loop
+  // is already running, then unmute on the first interaction above.
+  a.play()
+    .then(clearGesture)
+    .catch(() => {
+      if (!readMuted()) {
+        a.muted = true;
+        a.play().catch(() => {});
+      }
+    });
 }
 
 function clearGesture() {

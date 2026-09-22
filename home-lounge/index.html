@@ -145,12 +145,25 @@
       .card h3 { margin: 0 0 6px; font-size: 17px; color: var(--green); letter-spacing: 1px; text-transform: uppercase; }
       .card p { margin: 0; color: var(--fg); opacity: 0.8; font-size: 15px; }
 
+      /* Modes */
+      .badge { display: inline-block; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; border: 1px solid; margin-bottom: 14px; }
+      .badge.live { color: var(--neon); border-color: var(--neon); box-shadow: 0 0 12px rgba(22,255,14,0.3); }
+      .badge.soon { color: var(--muted); border-color: var(--border); }
+      .mode .big { font-family: var(--display); font-size: 34px; line-height: 1; color: #fff; letter-spacing: 1px; }
+      .mode .big .w { color: #fff; }
+      .mode .big .n { color: var(--neon); }
+      .mode .floors { color: var(--green); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin: 8px 0 12px; }
+      .mode-tagline { text-align: center; color: var(--green); letter-spacing: 3px; text-transform: uppercase; font-size: 13px; margin-top: 28px; text-shadow: 0 0 12px hsl(158 64% 52% / 0.4); }
+
       /* Zones */
-      .zones { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 34px; }
-      .zone { display: flex; align-items: baseline; gap: 14px; border-left: 2px solid var(--green-dim); padding: 8px 0 8px 14px; }
-      .zone .rng { font-family: var(--display); font-size: 26px; color: var(--neon); min-width: 76px; }
-      .zone .nm { letter-spacing: 1px; }
-      .zone.boss .nm::after { content: " ◆ boss"; color: var(--amber); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.8; }
+      .zones { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; margin-top: 34px; }
+      .zone { border-left: 2px solid var(--green-dim); padding: 6px 0 8px 16px; }
+      .zone .top { display: flex; align-items: baseline; gap: 12px; }
+      .zone .rng { font-family: var(--display); font-size: 24px; color: var(--neon); }
+      .zone .nm { letter-spacing: 1px; color: var(--fg); }
+      .zone .vibe { color: var(--muted); font-size: 13px; margin-top: 2px; }
+      .zone.final { border-color: #fff; }
+      .zone.final .rng, .zone.final .nm { color: #fff; }
 
       /* Floor type list */
       .ftypes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 34px; }
@@ -194,6 +207,7 @@
           <a href="#about">About</a>
           <a href="#building">The Building</a>
           <a href="#floors">Floors</a>
+          <a href="#modes">Modes</a>
           <a href="#support">Support</a>
           <a class="btn solid" href="/">▶ Play</a>
         </div>
@@ -223,11 +237,12 @@
         <p class="eyebrow">What is FL80R?</p>
         <h2>One run. <span class="n">80 floors.</span></h2>
         <p class="lead">
-          FL80R (<em>"Floor 80"</em>) drops you partway up an 80-storey building and dares you to
-          reach the top. Each floor is a self-contained challenge — a riddle, a bit of math, something
-          hidden in plain sight, a chase, or a boss. Solve it to climb. There are no saves and no
-          checkpoints: it's one continuous run to the top, wrapped in a retro terminal / CRT aesthetic
-          and built to be played out loud — solo, with friends, or live on stream.
+          FL80R (<em>"Floor 80"</em>) is a browser-based puzzle &amp; logic game. Climb an 80-floor
+          tower of riddles — hidden text, typed answers, math traps, memory floors, chase floors,
+          and a cat boss waiting on every tenth floor. There are no saves and no checkpoints:
+          it's one continuous run to the top, wrapped in a retro terminal / CRT aesthetic.
+          Play solo with a pen and paper, take turns with friends, or stream it and let an
+          audience shout answers.
         </p>
       </div>
     </section>
@@ -251,16 +266,17 @@
       <div class="wrap reveal">
         <p class="eyebrow">The Building</p>
         <h2>Eight <span class="n">zones</span></h2>
-        <p class="lead">Ten floors each, every zone with its own mood and colour palette. A boss guards every tenth floor.</p>
+        <p class="lead">Ten floors each, every zone with its own mood and colour palette. A cat boss guards every tenth floor.</p>
         <div class="zones">
-          <div class="zone"><span class="rng">1–10</span><span class="nm">The Lobby</span></div>
-          <div class="zone"><span class="rng">11–20</span><span class="nm">The Archives</span></div>
-          <div class="zone"><span class="rng">21–30</span><span class="nm">The Machine Room</span></div>
-          <div class="zone"><span class="rng">31–40</span><span class="nm">The Labyrinth</span></div>
-          <div class="zone"><span class="rng">41–50</span><span class="nm">The Observatory</span></div>
-          <div class="zone"><span class="rng">51–60</span><span class="nm">The Crypts</span></div>
-          <div class="zone"><span class="rng">61–70</span><span class="nm">The Glass Tower</span></div>
-          <div class="zone boss"><span class="rng">71–80</span><span class="nm">The Final Ascent</span></div>
+          <div class="zone"><div class="top"><span class="rng">1–10</span><span class="nm">The Lobby</span></div><div class="vibe">Tutorial energy — hidden text and riddles</div></div>
+          <div class="zone"><div class="top"><span class="rng">11–20</span><span class="nm">The Archives</span></div><div class="vibe">Filing cabinets, microfiche, ticker tape</div></div>
+          <div class="zone"><div class="top"><span class="rng">21–30</span><span class="nm">The Machine Room</span></div><div class="vibe">Valves, circuits, a very tired engineer</div></div>
+          <div class="zone"><div class="top"><span class="rng">31–40</span><span class="nm">The Labyrinth</span></div><div class="vibe">Mirror mazes, coffin riddles, torches</div></div>
+          <div class="zone"><div class="top"><span class="rng">41–50</span><span class="nm">The Observatory</span></div><div class="vibe">Morse code, ghosts who remember your answers</div></div>
+          <div class="zone"><div class="top"><span class="rng">51–60</span><span class="nm">The Crypts</span></div><div class="vibe">Dark and moody</div></div>
+          <div class="zone"><div class="top"><span class="rng">61–70</span><span class="nm">The Glass Tower</span></div><div class="vibe">Reflections everywhere</div></div>
+          <div class="zone"><div class="top"><span class="rng">71–79</span><span class="nm">The Final Ascent</span></div><div class="vibe">Final exams, needle CAPTCHAs</div></div>
+          <div class="zone final"><div class="top"><span class="rng">80</span><span class="nm">The Final Floor</span></div><div class="vibe">Blackest black. The top.</div></div>
         </div>
       </div>
     </section>
@@ -276,9 +292,38 @@
           <div class="ftype"><b>Chase</b><span>Think fast and keep moving under pressure.</span></div>
           <div class="ftype"><b>Circuit</b><span>A wiring / logic puzzle that guards each boss floor.</span></div>
           <div class="ftype"><b>Memory</b><span>Recall an answer from an earlier floor. Hope you wrote it down.</span></div>
-          <div class="ftype"><b>Boss</b><span>A fixed showdown every tenth floor. No randomness — pure test.</span></div>
+          <div class="ftype"><b>Cat boss</b><span>A cat demands tribute every tenth floor. Fixed and identical every run — pure test.</span></div>
           <div class="ftype"><b>Floor 80</b><span>The fixed finale at the very top. Get there.</span></div>
         </div>
+      </div>
+    </section>
+
+    <section id="modes">
+      <div class="wrap reveal">
+        <p class="eyebrow">The tower keeps growing</p>
+        <h2>One engine. <span class="n">Three modes.</span></h2>
+        <p class="lead">FL80R is the first floor of something bigger — the same engine wearing three different dress codes.</p>
+        <div class="grid cards-3">
+          <div class="card mode">
+            <span class="badge live">Live now</span>
+            <div class="big"><span class="w">FL</span><span class="n">80</span></div>
+            <div class="floors">80 floors</div>
+            <p>The pilgrimage. Hand-tuned, no saves, no checkpoints. Beat it and your name goes in the credits.</p>
+          </div>
+          <div class="card mode">
+            <span class="badge soon">On the way</span>
+            <div class="big"><span class="w">FL</span><span class="n">808</span><span class="w">R</span></div>
+            <div class="floors">808 floors · still growing</div>
+            <p>The ascent. Zones of twenty, checkpoints every hundred, progressive scaling, and a leaderboard. Climb beyond the limit.</p>
+          </div>
+          <div class="card mode">
+            <span class="badge soon">On the way</span>
+            <div class="big"><span class="n">Floorless</span></div>
+            <div class="floors">∞ floors</div>
+            <p>The void. No zones, no landmarks, no end — just floors forever, scaling with depth until a cat sighting becomes legend.</p>
+          </div>
+        </div>
+        <p class="mode-tagline">FL808R — climb beyond the limit. The 8s never stop.</p>
       </div>
     </section>
 
@@ -290,7 +335,8 @@
           <h2>Every 10 floors, a <span class="n">cat</span> demands tribute</h2>
           <p>FL80R is free and always will be. If it made you smile (or scream), tossing a coin keeps the cats fed and the floors coming.</p>
           <a class="btn solid" href="https://ko-fi.com/alarkiusej/tiers" target="_blank" rel="noopener noreferrer">☕ Support on Ko-fi</a>
-          <p class="meow" style="margin-top:26px;">Meowspporters: The cats are purring. Come back soon until Meowspporters have come~!</p>
+          <p style="color:var(--muted); font-size:13px; letter-spacing:1px; margin-top:14px;">Tiers &middot; Tower Visitor $3 &middot; FL80R Cat Tribute $10</p>
+          <p class="meow" style="margin-top:22px;">Meowspporters: The cats are purring. Come back soon until Meowspporters have come~!</p>
         </div>
       </div>
     </section>
@@ -305,7 +351,7 @@
 
     <footer>
       <div class="wrap">
-        <span class="made">FL80R — made by <b>Alarkius Elvya Jay</b></span>
+        <span class="made">FL80R — made by <b>Alarkius Elvya Jay</b> · Apache-2.0</span>
         <div class="links">
           <a href="/">Play</a>
           <a href="https://github.com/AlarkiusJay/floor-80webgame" target="_blank" rel="noopener noreferrer">GitHub</a>

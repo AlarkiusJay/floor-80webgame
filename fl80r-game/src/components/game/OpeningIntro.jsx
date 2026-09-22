@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import MuteButton from "@/components/game/MuteButton";
 
 // SVG heartbeat/EKG path that loops forever
 function HeartbeatLine() {
@@ -170,6 +171,8 @@ export default function OpeningIntro({ onDone }) {
       animate={{ opacity: phase === "done" ? 0 : 1 }}
       transition={{ duration: 0.6, ease: "easeInOut" }}
     >
+      <MuteButton />
+
       {/* Subtle grid */}
       <div
         className="absolute inset-0 opacity-5 pointer-events-none"

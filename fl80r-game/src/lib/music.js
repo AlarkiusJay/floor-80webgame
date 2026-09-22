@@ -3,6 +3,7 @@
 // "fl80r_music_volume", stored 0-100).
 
 const VOLUME_KEY = "fl80r_music_volume";
+const MUTE_KEY = "fl80r_music_muted";
 const THEME_SRC = "/audio/fl80r-theme.mp3";
 
 let audio = null;
@@ -17,14 +18,43 @@ function readVolume() {
   }
 }
 
+function readMuted() {
+  try {
+    return localStorage.getItem(MUTE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function ensureAudio() {
   if (!audio) {
     audio = new Audio(THEME_SRC);
     audio.loop = true;
     audio.preload = "auto";
     audio.volume = readVolume();
+    audio.muted = readMuted();
   }
   return audio;
+}
+
+// Mute controls (persisted). Muting keeps the slider's volume intact.
+export function isMuted() {
+  return readMuted();
+}
+
+export function setMuted(muted) {
+  try {
+    localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+  if (audio) audio.muted = muted;
+}
+
+export function toggleMuted() {
+  const next = !readMuted();
+  setMuted(next);
+  return next;
 }
 
 // Live volume control from the slider (pct is 0-100).

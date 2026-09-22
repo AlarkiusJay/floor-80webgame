@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, useAnimation } from "framer-motion";
 import OpeningIntro from "@/components/game/OpeningIntro";
 import IntroMenu from "@/components/game/IntroMenu";
+import MuteButton from "@/components/game/MuteButton";
 import { playTheme, stopTheme } from "@/lib/music";
 
 // Typewriter hook — loops forever, slow
@@ -54,6 +55,9 @@ export default function IntroScreen({ onStart }) {
 
   return (
     <div className="min-h-screen bg-[#010101] flex flex-col items-center justify-center relative overflow-x-hidden scanlines py-4 sm:py-0">
+      {/* Top-left mute toggle */}
+      <MuteButton />
+
       {/* Top-right menu: Settings / Donate / Credits */}
       <IntroMenu />
 

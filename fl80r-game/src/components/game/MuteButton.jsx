@@ -19,7 +19,7 @@ export default function MuteButton() {
       onPointerDown={(e) => e.stopPropagation()}
       aria-label={muted ? "Unmute music" : "Mute music"}
       title={muted ? "Unmute music" : "Mute music"}
-      className="fixed top-4 left-4 z-[120] flex items-center justify-center w-9 h-9 rounded border border-primary/25 bg-black/30 text-primary/70 hover:text-primary hover:border-primary/60 hover:bg-primary/5 transition-all"
+      className="flex items-center justify-center w-9 h-9 rounded border border-primary/25 bg-black/30 text-primary/70 hover:text-primary hover:border-primary/60 hover:bg-primary/5 transition-all"
     >
       {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
     </button>

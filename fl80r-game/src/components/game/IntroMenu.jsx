@@ -5,9 +5,10 @@ import { setMusicVolume } from "@/lib/music";
 
 const KOFI_URL = "https://ko-fi.com/alarkiusej/tiers";
 const ISSUES_URL = "https://github.com/AlarkiusJay/floor-80webgame/issues";
-
-// Add Meowspporter names here as they support — e.g. ["Ada", "Mochi the Cat"]
-const CONTRIBUTORS = [];
+const HUB_CONTRIBUTORS_URL = "https://www.fl80r.party/hub/contributors.html";
+// Supporters live in /contributors.json (edit fl80r-game/public/contributors.json,
+// newest first). The game shows the latest few; the hub shows the full list.
+const LATEST_COUNT = 6;
 
 function Panel({ title, icon, onClose, children }) {
   useEffect(() => {
@@ -80,6 +81,26 @@ export default function IntroMenu() {
       /* ignore storage errors (private mode, etc.) */
     }
   }, [volume]);
+
+  // Latest supporters (full list lives on the hub).
+  const [contributors, setContributors] = useState([]);
+  const [contribLoaded, setContribLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/contributors.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (alive) {
+          setContributors(Array.isArray(data) ? data : []);
+          setContribLoaded(true);
+        }
+      })
+      .catch(() => alive && setContribLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const close = useCallback(() => setOpen(null), []);
 
@@ -191,35 +212,53 @@ export default function IntroMenu() {
             icon={<Star size={16} />}
             onClose={close}
           >
-            <div className="space-y-5 font-mono-game text-center">
+            <div className="space-y-4 font-mono-game text-center">
               <p className="text-[10px] text-muted-foreground tracking-[0.25em] uppercase">
-                Meowspporters
+                Latest Meowspporters
               </p>
 
-              {CONTRIBUTORS.length === 0 ? (
+              {!contribLoaded ? (
+                <p className="text-xs text-muted-foreground/50">Loading…</p>
+              ) : contributors.length === 0 ? (
                 <p className="text-sm text-foreground/60 leading-relaxed italic px-2">
                   The Cats are Purring. Come back Soon until Meowspporters have
                   come~!
                 </p>
               ) : (
                 <ul className="space-y-1.5">
-                  {CONTRIBUTORS.map((name) => (
-                    <li key={name} className="text-sm text-primary/90">
-                      {name}
+                  {contributors.slice(0, LATEST_COUNT).map((c, i) => (
+                    <li key={(c.name || "") + i} className="text-sm text-primary/90">
+                      {c.name}
+                      {c.tier ? (
+                        <span className="text-muted-foreground/60 text-xs"> · {c.tier}</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
               )}
 
-              <a
-                href={KOFI_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-[11px] text-primary/60 hover:text-primary tracking-widest uppercase transition-colors"
-              >
-                <Star size={12} />
-                Become a Meowspporter
-              </a>
+              {contribLoaded && contributors.length > 0 && (
+                <a
+                  href={HUB_CONTRIBUTORS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[11px] text-primary/70 hover:text-primary tracking-widest uppercase transition-colors"
+                >
+                  See all supporters →
+                </a>
+              )}
+
+              <div>
+                <a
+                  href={KOFI_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[11px] text-primary/60 hover:text-primary tracking-widest uppercase transition-colors"
+                >
+                  <Star size={12} />
+                  Become a Meowspporter
+                </a>
+              </div>
             </div>
           </Panel>
         )}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings, Cat, Star, X, Coffee, Github } from "lucide-react";
+import { setMusicVolume } from "@/lib/music";
 
 const KOFI_URL = "https://ko-fi.com/alarkiusej/tiers";
 const ISSUES_URL = "https://github.com/AlarkiusJay/floor-80webgame/issues";
@@ -72,6 +73,7 @@ export default function IntroMenu() {
   });
 
   useEffect(() => {
+    setMusicVolume(volume); // apply to the playing theme live
     try {
       localStorage.setItem("fl80r_music_volume", String(volume));
     } catch {
@@ -133,11 +135,9 @@ export default function IntroMenu() {
                 />
               </div>
 
-              <div className="border border-accent/25 bg-accent/5 rounded px-3 py-2.5">
-                <p className="text-xs text-accent glow-amber leading-relaxed">
-                  🎵 Music is coming soon! Check back later!
-                </p>
-              </div>
+              <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+                🎵 Controls the main screen theme.
+              </p>
 
               <a
                 href={ISSUES_URL}

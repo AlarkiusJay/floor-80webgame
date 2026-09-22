@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, useAnimation } from "framer-motion";
 import OpeningIntro from "@/components/game/OpeningIntro";
 import IntroMenu from "@/components/game/IntroMenu";
+import { playTheme, stopTheme } from "@/lib/music";
 
 // Typewriter hook — loops forever, slow
 function useTypewriter(text, speed = 80, pauseMs = 2500) {
@@ -33,6 +34,12 @@ function useTypewriter(text, speed = 80, pauseMs = 2500) {
 export default function IntroScreen({ onStart }) {
   const [visible, setVisible] = useState(false);
   const [introDone, setIntroDone] = useState(false);
+
+  // Play the theme across the main + how-to screens; stop on entering the game.
+  useEffect(() => {
+    playTheme();
+    return () => stopTheme();
+  }, []);
 
   useEffect(() => {
     if (!introDone) return;

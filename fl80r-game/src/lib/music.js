@@ -12,9 +12,9 @@ let gestureCleanup = null;
 function readVolume() {
   try {
     const v = localStorage.getItem(VOLUME_KEY);
-    return v !== null ? Number(v) / 100 : 0.7;
+    return v !== null ? Number(v) / 100 : 0.15;
   } catch {
-    return 0.7;
+    return 0.15;
   }
 }
 

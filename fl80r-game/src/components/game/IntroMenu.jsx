@@ -67,9 +67,9 @@ export default function IntroMenu() {
   const [volume, setVolume] = useState(() => {
     try {
       const v = localStorage.getItem("fl80r_music_volume");
-      return v !== null ? Number(v) : 70;
+      return v !== null ? Number(v) : 15;
     } catch {
-      return 70;
+      return 15;
     }
   });
 

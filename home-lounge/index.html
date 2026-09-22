@@ -94,7 +94,9 @@
       .nav-links { display: flex; gap: 22px; align-items: center; }
       .nav-links a { color: var(--muted); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; transition: color .2s; }
       .nav-links a:hover { color: var(--green); }
-      @media (max-width: 720px) { .nav-links a:not(.btn) { display: none; } }
+      .nav-links a.yt { color: var(--green); display: inline-flex; align-items: center; }
+      .nav-links a.yt:hover { color: var(--neon); filter: drop-shadow(0 0 6px rgba(22,255,14,0.4)); }
+      @media (max-width: 720px) { .nav-links a:not(.btn):not(.yt) { display: none; } }
 
       .btn {
         display: inline-flex; align-items: center; gap: 8px;
@@ -209,6 +211,9 @@
           <a href="#floors">Floors</a>
           <a href="#modes">Modes</a>
           <a href="#support">Support</a>
+          <a class="yt" href="https://www.youtube.com/@Floor80Party" target="_blank" rel="noopener noreferrer" aria-label="FL80R on YouTube" title="YouTube">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.11-2.12C19.5 3.55 12 3.55 12 3.55s-7.5 0-9.39.53A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.11 2.12c1.89.53 9.39.53 9.39.53s7.5 0 9.39-.53A3 3 0 0 0 23.5 17.8 31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8ZM9.55 15.57V8.43L15.82 12l-6.27 3.57Z"/></svg>
+          </a>
           <a class="btn solid" href="/">▶ Play</a>
         </div>
       </div>
@@ -356,6 +361,7 @@
         <div class="links">
           <a href="/">Play</a>
           <a href="./contributors.html">Contributors</a>
+          <a href="https://www.youtube.com/@Floor80Party" target="_blank" rel="noopener noreferrer">YouTube</a>
           <a href="https://github.com/AlarkiusJay/floor-80webgame" target="_blank" rel="noopener noreferrer">GitHub</a>
           <a href="https://github.com/AlarkiusJay/floor-80webgame/issues" target="_blank" rel="noopener noreferrer">Report a bug</a>
           <a href="https://ko-fi.com/alarkiusej/tiers" target="_blank" rel="noopener noreferrer">Support</a>

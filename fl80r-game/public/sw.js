@@ -9,6 +9,7 @@ const CORE = [
   "/hub",
   "/hub/faq.html",
   "/hub/contributors.html",
+  "/hub/hub.webmanifest",
 ];
 
 self.addEventListener("install", (event) => {

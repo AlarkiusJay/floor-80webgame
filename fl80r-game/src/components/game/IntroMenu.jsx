@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, Cat, Star, X, Coffee, Github } from "lucide-react";
+import { Settings, Cat, Star, X, Coffee, Github, RotateCw } from "lucide-react";
 import { setMusicVolume } from "@/lib/music";
 
 const KOFI_URL = "https://ko-fi.com/alarkiusej/tiers";
@@ -102,6 +102,19 @@ export default function IntroMenu() {
     };
   }, []);
 
+  // Mobile-only refresh (pull-to-refresh is disabled during puzzles).
+  const [isMobile] = useState(() => {
+    try {
+      return window.matchMedia("(pointer: coarse)").matches;
+    } catch {
+      return false;
+    }
+  });
+  const [confirmRefresh, setConfirmRefresh] = useState(false);
+  useEffect(() => {
+    if (open !== "settings") setConfirmRefresh(false);
+  }, [open]);
+
   const close = useCallback(() => setOpen(null), []);
 
   const NavButton = ({ id, icon, label }) => (
@@ -172,6 +185,36 @@ export default function IntroMenu() {
                   on GitHub!
                 </span>
               </a>
+
+              {isMobile &&
+                (!confirmRefresh ? (
+                  <button
+                    onClick={() => setConfirmRefresh(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded border border-primary/25 bg-black/30 px-3 py-2.5 text-primary/70 hover:text-primary hover:border-primary/60 hover:bg-primary/5 transition-all text-xs tracking-widest uppercase"
+                  >
+                    <RotateCw size={15} /> Refresh Game
+                  </button>
+                ) : (
+                  <div className="rounded border border-accent/30 bg-accent/5 px-3 py-3 text-center">
+                    <p className="text-[11px] text-accent glow-amber leading-relaxed mb-2.5">
+                      ⚠ Reload the game? Your current run will be lost.
+                    </p>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="rounded border border-primary bg-primary/10 px-4 py-1.5 text-primary text-xs tracking-widest uppercase hover:bg-primary/20 transition-all"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setConfirmRefresh(false)}
+                        className="rounded border border-border px-4 py-1.5 text-muted-foreground text-xs tracking-widest uppercase hover:text-foreground transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ))}
 
               <p className="pt-1 text-center text-[10px] tracking-widest uppercase text-muted-foreground/70">
                 FL80R by Alarkius Elvya Jay

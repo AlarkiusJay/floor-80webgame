@@ -1,77 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// ─── Circuit piece definitions ───────────────────────────────────────────────
-// Each piece has connection ports: N, E, S, W (true = has connection)
-// Visual is an SVG path drawn inside a 40x40 box
-const PIECE_TYPES = {
-  straight_h:  { ports: { N:false, E:true,  S:false, W:true  }, label: "─" },
-  straight_v:  { ports: { N:true,  E:false, S:true,  W:false }, label: "│" },
-  corner_ne:   { ports: { N:true,  E:true,  S:false, W:false }, label: "└" },
-  corner_nw:   { ports: { N:true,  E:false, S:false, W:true  }, label: "┘" },
-  corner_se:   { ports: { N:false, E:true,  S:true,  W:false }, label: "┌" },
-  corner_sw:   { ports: { N:false, E:false, S:true,  W:true  }, label: "┐" },
-  t_north:     { ports: { N:true,  E:true,  S:false, W:true  }, label: "┴" },
-  t_south:     { ports: { N:false, E:true,  S:true,  W:true  }, label: "┬" },
-  t_east:      { ports: { N:true,  E:true,  S:true,  W:false }, label: "├" },
-  t_west:      { ports: { N:true,  E:false, S:true,  W:true  }, label: "┤" },
-  cross:       { ports: { N:true,  E:true,  S:true,  W:true  }, label: "┼" },
-  empty:       { ports: { N:false, E:false, S:false, W:false }, label: " " },
-};
-
-const TYPE_KEYS = Object.keys(PIECE_TYPES).filter(k => k !== "empty");
-
-// Rotate ports 90° clockwise
-function rotatePorts(ports) {
-  return { N: ports.W, E: ports.N, S: ports.E, W: ports.S };
-}
-
-// Get effective ports after n rotations
-function getEffectivePorts(typeKey, rotation) {
-  let ports = { ...PIECE_TYPES[typeKey].ports };
-  for (let i = 0; i < (rotation % 4); i++) ports = rotatePorts(ports);
-  return ports;
-}
-
-// SVG path for a circuit piece (40x40 viewBox)
-function PieceSVG({ typeKey, rotation, solved, isSource, isDest }) {
-  const ports = getEffectivePorts(typeKey, rotation);
-  const cx = 20, cy = 20, r = 5;
-  const color = solved ? "hsl(158 64% 52%)" : isSource ? "hsl(43 96% 56%)" : isDest ? "hsl(0 72% 51%)" : "hsl(158 64% 52% / 0.5)";
-  const glow = solved ? "drop-shadow(0 0 4px hsl(158 64% 52% / 0.9))" : "none";
-
-  const lines = [];
-  if (ports.N) lines.push(`M${cx},${cy} L${cx},0`);
-  if (ports.S) lines.push(`M${cx},${cy} L${cx},40`);
-  if (ports.E) lines.push(`M${cx},${cy} L40,${cy}`);
-  if (ports.W) lines.push(`M${cx},${cy} L0,${cy}`);
-
-  return (
-    <svg viewBox="0 0 40 40" width="100%" height="100%" style={{ filter: glow }}>
-      {lines.map((d, i) => (
-        <path key={i} d={d} stroke={color} strokeWidth="2.5" strokeLinecap="round" fill="none" />
-      ))}
-      <circle cx={cx} cy={cy} r={r} fill={isSource ? "hsl(43 96% 56% / 0.3)" : isDest ? "hsl(0 72% 51% / 0.3)" : "hsl(158 64% 52% / 0.15)"}
-        stroke={color} strokeWidth="1.5" />
-      {(isSource || isDest) && (
-        <circle cx={cx} cy={cy} r="2" fill={color} />
-      )}
-    </svg>
-  );
-}
-
-// ─── Puzzle generation ────────────────────────────────────────────────────────
-const COLS = 5, ROWS = 7;
-
-const PATTERNS = [
-  { name: "the letter H", path: [[0,0],[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[1,3],[2,3],[3,3],[4,0],[4,1],[4,2],[4,3],[4,4],[4,5],[4,6]] },
-  { name: "the letter T", path: [[0,0],[1,0],[2,0],[3,0],[4,0],[2,1],[2,2],[2,3],[2,4],[2,5],[2,6]] },
-  { name: "the letter L", path: [[0,0],[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[1,6],[2,6],[3,6],[4,6]] },
-  { name: "the letter Z", path: [[0,0],[1,0],[2,0],[3,0],[4,0],[3,1],[2,2],[2,3],[1,4],[0,5],[0,6],[1,6],[2,6],[3,6],[4,6]] },
-  { name: "the number 1", path: [[1,0],[2,0],[2,1],[2,2],[2,3],[2,4],[2,5],[2,6],[1,6],[3,6]] },
-  { name: "the number 7", path: [[0,0],[1,0],[2,0],[3,0],[4,0],[4,1],[3,2],[2,3],[2,4],[2,5],[2,6]] },
-  { name: "an arrow pointing right", path: [[0,3],[1,3],[2,3],[3,3],[4,3],[3,2],[3,4],[2,1],[2,5]] },
-  { name: "a cross / plus sign", path: [[2,0],[2,1],[2,2],[2,3],[2,4],[2,5],[2,6],[0,3],[1,3],[3,3],[4,3]] },
+// ── Neon palette ──────────────────────────────────────────────────────────────
+const PALETTE = [
+  { id: "green", c: "hsl(158 64% 52%)" },
+  { id: "cyan", c: "hsl(190 85% 55%)" },
+  { id: "amber", c: "hsl(43 96% 56%)" },
+  { id: "magenta", c: "hsl(315 75% 62%)" },
+  { id: "red", c: "hsl(0 72% 58%)" },
+  { id: "blue", c: "hsl(222 84% 65%)" },
 ];
 
 function shuffle(arr) {
@@ -83,78 +20,406 @@ function shuffle(arr) {
   return a;
 }
 
-function generatePuzzle() {
-  const pattern = PATTERNS[Math.floor(Math.random() * PATTERNS.length)];
-  const pathSet = new Set(pattern.path.map(([c, r]) => `${c},${r}`));
+// ═══════════════════════════════════════════════════════════════════════════
+// STYLE 1 — WIRES (Among Us): drag each left node to the same-colour right node
+// ═══════════════════════════════════════════════════════════════════════════
+function WiresPuzzle({ onSolvedChange, locked }) {
+  const { colors, rightOrder } = useMemo(() => {
+    const count = 4 + Math.floor(Math.random() * 2); // 4–5 wires
+    const colors = shuffle(PALETTE).slice(0, count);
+    let rightOrder = shuffle(colors);
+    // avoid a trivially-aligned board
+    if (rightOrder.every((c, i) => c.id === colors[i].id)) rightOrder = shuffle(colors);
+    return { colors, rightOrder };
+  }, []);
 
-  const grid = [];
-  for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLS; col++) {
-      const inPath = pathSet.has(`${col},${row}`);
-      const typeKey = inPath
-        ? TYPE_KEYS[Math.floor(Math.random() * TYPE_KEYS.length)]
-        : "straight_h";
-      const correctRotation = 0; // rotation 0 is always "correct" — we shuffle
-      const shuffledRotation = Math.floor(Math.random() * 4);
-      grid.push({
-        id: `${col}-${row}`,
-        col, row,
-        typeKey,
-        inPath,
-        correctRotation,
-        currentRotation: shuffledRotation,
-      });
-    }
-  }
+  const W = 300;
+  const rowH = 62;
+  const H = colors.length * rowH + 20;
+  const leftX = 34;
+  const rightX = W - 34;
+  const yOf = (i) => 30 + i * rowH;
+  const R = 15;
 
-  // Source = first path cell, Dest = last path cell
-  const sourceKey = pattern.path[0];
-  const destKey = pattern.path[pattern.path.length - 1];
+  const [wires, setWires] = useState({}); // colorId -> true (connected correctly)
+  const [drag, setDrag] = useState(null); // { colorId, x, y }
+  const svgRef = useRef(null);
 
-  return { grid, pattern, sourceKey, destKey };
-}
+  useEffect(() => {
+    onSolvedChange(Object.keys(wires).length === colors.length);
+  }, [wires, colors.length, onSolvedChange]);
 
-// Check if ALL path cells have rotation = 0 (correct)
-function isSolved(grid) {
-  return grid.filter(c => c.inPath).every(c => c.currentRotation === c.correctRotation);
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-export default function CircuitPuzzleFloor({ floor, floorData, onAdvance }) {
-  const [puzzle] = useState(() => generatePuzzle());
-  const [grid, setGrid] = useState(puzzle.grid);
-  const [solved, setSolved] = useState(false);
-  const [ekgDone, setEkgDone] = useState(false);
-
-  const handleCellClick = useCallback((cellId) => {
-    if (solved) return;
-    setGrid(prev => {
-      const next = prev.map(c =>
-        c.id === cellId
-          ? { ...c, currentRotation: (c.currentRotation + 1) % 4 }
-          : c
-      );
-      if (isSolved(next)) {
-        setTimeout(() => setSolved(true), 50);
-      }
-      return next;
-    });
-  }, [solved]);
-
-  const getCell = (col, row) => grid.find(c => c.col === col && c.row === row);
-  const isSource = (col, row) => col === puzzle.sourceKey[0] && row === puzzle.sourceKey[1];
-  const isDest   = (col, row) => col === puzzle.destKey[0]   && row === puzzle.destKey[1];
-
-  const sectionColor = {
-    "1-10": "hsl(158 64% 52%)",
-    "11-20": "hsl(43 96% 56%)",
-    "21-30": "hsl(158 64% 52%)",
-    "31-40": "hsl(43 96% 56%)",
-    "41-50": "hsl(200 64% 52%)",
-    "51-60": "hsl(280 50% 55%)",
-    "61-70": "hsl(200 70% 60%)",
-    "71-79": "hsl(0 72% 51%)",
+  const pt = (e) => {
+    const r = svgRef.current.getBoundingClientRect();
+    return {
+      x: ((e.clientX - r.left) / r.width) * W,
+      y: ((e.clientY - r.top) / r.height) * H,
+    };
   };
+
+  const leftHit = (p) =>
+    colors.findIndex((_, i) => Math.hypot(p.x - leftX, p.y - yOf(i)) < R + 10);
+  const rightHit = (p) =>
+    rightOrder.findIndex((_, i) => Math.hypot(p.x - rightX, p.y - yOf(i)) < R + 12);
+
+  const onDown = (e) => {
+    if (locked) return;
+    const p = pt(e);
+    const li = leftHit(p);
+    if (li < 0) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const colorId = colors[li].id;
+    setWires((w) => {
+      const n = { ...w };
+      delete n[colorId];
+      return n;
+    });
+    setDrag({ colorId, x: p.x, y: p.y });
+  };
+
+  const onMove = (e) => {
+    if (!drag) return;
+    const p = pt(e);
+    setDrag((d) => (d ? { ...d, x: p.x, y: p.y } : d));
+  };
+
+  const onUp = (e) => {
+    if (!drag) return;
+    const p = pt(e);
+    const ri = rightHit(p);
+    if (ri >= 0 && rightOrder[ri].id === drag.colorId) {
+      setWires((w) => ({ ...w, [drag.colorId]: ri }));
+    }
+    setDrag(null);
+  };
+
+  return (
+    <svg
+      ref={svgRef}
+      viewBox={`0 0 ${W} ${H}`}
+      width="100%"
+      style={{ maxWidth: 360, touchAction: "none", userSelect: "none" }}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    >
+      {/* connected wires */}
+      {colors.map((col, i) =>
+        wires[col.id] !== undefined ? (
+          <line
+            key={"w" + col.id}
+            x1={leftX}
+            y1={yOf(i)}
+            x2={rightX}
+            y2={yOf(wires[col.id])}
+            stroke={col.c}
+            strokeWidth="5"
+            strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 4px ${col.c})` }}
+          />
+        ) : null
+      )}
+      {/* active drag wire */}
+      {drag && (
+        <line
+          x1={leftX}
+          y1={yOf(colors.findIndex((c) => c.id === drag.colorId))}
+          x2={drag.x}
+          y2={drag.y}
+          stroke={colors.find((c) => c.id === drag.colorId).c}
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray="2 6"
+          style={{ filter: `drop-shadow(0 0 4px ${colors.find((c) => c.id === drag.colorId).c})` }}
+        />
+      )}
+      {/* left nodes */}
+      {colors.map((col, i) => (
+        <g key={"l" + col.id} style={{ cursor: locked ? "default" : "grab" }}>
+          <circle cx={leftX} cy={yOf(i)} r={R} fill={col.c} opacity={0.18} />
+          <circle cx={leftX} cy={yOf(i)} r={R} fill="none" stroke={col.c} strokeWidth="2.5"
+            style={{ filter: `drop-shadow(0 0 5px ${col.c})` }} />
+          <circle cx={leftX} cy={yOf(i)} r="4" fill={col.c} />
+        </g>
+      ))}
+      {/* right nodes */}
+      {rightOrder.map((col, i) => {
+        const done = Object.values(wires).includes(i);
+        return (
+          <g key={"r" + col.id}>
+            <circle cx={rightX} cy={yOf(i)} r={R} fill={col.c} opacity={done ? 0.28 : 0.1} />
+            <circle cx={rightX} cy={yOf(i)} r={R} fill="none" stroke={col.c} strokeWidth="2.5"
+              strokeDasharray={done ? "0" : "3 3"}
+              style={{ filter: done ? `drop-shadow(0 0 5px ${col.c})` : "none" }} />
+            <circle cx={rightX} cy={yOf(i)} r="4" fill={col.c} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STYLE 2 — FLOW: drag to connect each pair of same-colour endpoints
+// ═══════════════════════════════════════════════════════════════════════════
+function genFlow() {
+  const N = 5;
+  const K = 3 + Math.floor(Math.random() * 2); // 3–4 pairs
+  const colors = shuffle(PALETTE).slice(0, K);
+  const owner = new Array(N * N).fill(null);
+  const idx = (r, c) => r * N + c;
+  const nbrs = (cell) => {
+    const r = Math.floor(cell / N), c = cell % N, out = [];
+    if (r > 0) out.push(idx(r - 1, c));
+    if (r < N - 1) out.push(idx(r + 1, c));
+    if (c > 0) out.push(idx(r, c - 1));
+    if (c < N - 1) out.push(idx(r, c + 1));
+    return out;
+  };
+  const endpoints = {};
+  const used = [];
+  for (const col of colors) {
+    const free = [];
+    for (let i = 0; i < N * N; i++) if (owner[i] === null) free.push(i);
+    if (free.length < 2) break;
+    const start = free[Math.floor(Math.random() * free.length)];
+    const path = [start];
+    owner[start] = col.id;
+    const targetLen = 3 + Math.floor(Math.random() * 4);
+    let cur = start;
+    while (path.length < targetLen) {
+      const opts = nbrs(cur).filter((n) => owner[n] === null);
+      if (!opts.length) break;
+      const nx = opts[Math.floor(Math.random() * opts.length)];
+      owner[nx] = col.id;
+      path.push(nx);
+      cur = nx;
+    }
+    if (path.length < 2) {
+      owner[start] = null;
+      continue;
+    }
+    endpoints[col.id] = [path[0], path[path.length - 1]];
+    used.push(col);
+  }
+  return { N, colors: used, endpoints };
+}
+
+function FlowPuzzle({ onSolvedChange, locked }) {
+  const puzzle = useMemo(() => genFlow(), []);
+  const { N, colors, endpoints } = puzzle;
+
+  const reserved = useMemo(() => {
+    const m = {};
+    for (const col of colors) {
+      m[endpoints[col.id][0]] = col.id;
+      m[endpoints[col.id][1]] = col.id;
+    }
+    return m;
+  }, [colors, endpoints]);
+
+  // paths: colorId -> [cells]
+  const [paths, setPaths] = useState({});
+  const activeRef = useRef(null);
+  const gridRef = useRef(null);
+
+  const solvedCount = colors.filter((col) => {
+    const p = paths[col.id];
+    if (!p || p.length < 2) return false;
+    const [a, b] = endpoints[col.id];
+    return (p[0] === a && p[p.length - 1] === b) || (p[0] === b && p[p.length - 1] === a);
+  }).length;
+
+  useEffect(() => {
+    onSolvedChange(solvedCount === colors.length && colors.length > 0);
+  }, [solvedCount, colors.length, onSolvedChange]);
+
+  const cellFrom = (e) => {
+    const r = gridRef.current.getBoundingClientRect();
+    const size = r.width / N;
+    const c = Math.floor((e.clientX - r.left) / size);
+    const row = Math.floor((e.clientY - r.top) / size);
+    if (c < 0 || c >= N || row < 0 || row >= N) return -1;
+    return row * N + c;
+  };
+
+  const isEndpoint = (cell, colorId) =>
+    endpoints[colorId] && (endpoints[colorId][0] === cell || endpoints[colorId][1] === cell);
+
+  const startDrag = (cell) => {
+    if (locked || cell < 0) return;
+    let colorId = null;
+    let newPath = null;
+    if (reserved[cell]) {
+      colorId = reserved[cell];
+      newPath = [cell]; // start fresh from this endpoint
+    } else {
+      for (const cid of Object.keys(paths)) {
+        if (paths[cid].includes(cell)) {
+          colorId = cid;
+          break;
+        }
+      }
+      if (!colorId) return;
+      const p = paths[colorId];
+      newPath = p.slice(0, p.indexOf(cell) + 1); // truncate to here, keep drawing
+    }
+    activeRef.current = colorId;
+    setPaths((prev) => ({ ...prev, [colorId]: newPath }));
+  };
+
+  const extendTo = (cell) => {
+    const colorId = activeRef.current;
+    if (!colorId || cell < 0) return;
+    setPaths((prev) => {
+      const path = prev[colorId] ? [...prev[colorId]] : [];
+      if (!path.length) return prev;
+      const last = path[path.length - 1];
+      if (cell === last) return prev;
+      // must be orthogonally adjacent
+      const dr = Math.abs(Math.floor(cell / N) - Math.floor(last / N));
+      const dc = Math.abs((cell % N) - (last % N));
+      if (dr + dc !== 1) return prev;
+      // backtrack over own path
+      if (path.length >= 2 && cell === path[path.length - 2]) {
+        path.pop();
+        return { ...prev, [colorId]: path };
+      }
+      // blocked by another colour's endpoint
+      if (reserved[cell] && reserved[cell] !== colorId) return prev;
+      // blocked by another colour's path
+      for (const cid of Object.keys(prev)) {
+        if (cid !== colorId && prev[cid].includes(cell)) return prev;
+      }
+      if (path.includes(cell)) return prev; // no self-loop
+      path.push(cell);
+      return { ...prev, [colorId]: path };
+    });
+  };
+
+  const onDown = (e) => {
+    if (locked) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    startDrag(cellFrom(e));
+  };
+  const onMove = (e) => {
+    if (!activeRef.current) return;
+    extendTo(cellFrom(e));
+  };
+  const onUp = () => {
+    activeRef.current = null;
+  };
+
+  const colorOf = (id) => colors.find((c) => c.id === id)?.c;
+  const size = 100;
+
+  // build polyline points per colour
+  const centre = (cell) => [((cell % N) + 0.5) * size, (Math.floor(cell / N) + 0.5) * size];
+
+  return (
+    <div
+      ref={gridRef}
+      style={{
+        position: "relative",
+        width: "min(88vw, 340px)",
+        aspectRatio: "1 / 1",
+        touchAction: "none",
+        userSelect: "none",
+        cursor: locked ? "default" : "crosshair",
+      }}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    >
+      {/* cells */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "grid",
+          gridTemplateColumns: `repeat(${N}, 1fr)`,
+          gridTemplateRows: `repeat(${N}, 1fr)`,
+          gap: 0,
+        }}
+      >
+        {Array.from({ length: N * N }, (_, i) => (
+          <div
+            key={i}
+            style={{
+              border: "1px solid hsl(158 64% 52% / 0.14)",
+              background: "hsl(220 18% 9% / 0.5)",
+            }}
+          />
+        ))}
+      </div>
+
+      {/* paths + endpoints */}
+      <svg viewBox={`0 0 ${N * size} ${N * size}`} width="100%" height="100%"
+        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        {Object.keys(paths).map((cid) => {
+          const p = paths[cid];
+          if (!p || p.length < 2) return null;
+          const pts = p.map(centre).map(([x, y]) => `${x},${y}`).join(" ");
+          return (
+            <polyline key={cid} points={pts} fill="none" stroke={colorOf(cid)}
+              strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" opacity="0.9"
+              style={{ filter: `drop-shadow(0 0 5px ${colorOf(cid)})` }} />
+          );
+        })}
+        {colors.map((col) =>
+          endpoints[col.id].map((cell, k) => {
+            const [x, y] = centre(cell);
+            return (
+              <g key={col.id + k}>
+                <circle cx={x} cy={y} r="30" fill={col.c} opacity="0.22" />
+                <circle cx={x} cy={y} r="18" fill={col.c}
+                  style={{ filter: `drop-shadow(0 0 6px ${col.c})` }} />
+              </g>
+            );
+          })
+        )}
+      </svg>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Main
+// ═══════════════════════════════════════════════════════════════════════════
+export default function CircuitPuzzleFloor({ floor, floorData, onAdvance }) {
+  const [style] = useState(() => (Math.random() < 0.5 ? "wires" : "flow"));
+  const [solved, setSolved] = useState(false);
+  const [locked, setLocked] = useState(false);
+
+  // Disable mobile pull-to-refresh while the drag puzzle is on screen
+  // (overscroll-behavior only affects touch — desktop is unaffected).
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevH = html.style.overscrollBehaviorY;
+    const prevB = body.style.overscrollBehaviorY;
+    html.style.overscrollBehaviorY = "contain";
+    body.style.overscrollBehaviorY = "contain";
+    return () => {
+      html.style.overscrollBehaviorY = prevH;
+      body.style.overscrollBehaviorY = prevB;
+    };
+  }, []);
+
+  const onSolvedChange = useCallback((s) => setSolved(s), []);
+
+  const lockIn = () => {
+    if (!solved || locked) return;
+    setLocked(true);
+    setTimeout(() => onAdvance(floorData.nextFloor), 1200);
+  };
+
+  const instructions =
+    style === "wires"
+      ? "Drag each node on the left to the matching-colour node on the right."
+      : "Drag from a glowing node to its matching pair. Connect every colour.";
 
   return (
     <motion.div
@@ -164,204 +429,82 @@ export default function CircuitPuzzleFloor({ floor, floorData, onAdvance }) {
       transition={{ duration: 0.6 }}
       className="min-h-screen flex flex-col items-center px-4 py-8"
     >
-      {/* Badge */}
       <div className="flex items-center gap-2 mb-5">
         <span className="text-primary glow-green font-mono-game text-xs tracking-widest uppercase border border-primary/30 rounded px-2 py-1">
           ⚡ Circuit Floor — Pre-Boss
         </span>
       </div>
 
-      {/* Hint */}
-      <div className="terminal-border rounded-md p-4 mb-5 max-w-lg w-full text-center">
+      <div className="terminal-border rounded-md p-4 mb-6 max-w-lg w-full text-center">
         <p className="text-accent glow-amber font-mono-game text-xs tracking-widest uppercase mb-1">
-          ⚠ Circuit Alignment Required
+          ⚠ Restore the Circuit
         </p>
-        <p className="text-foreground/80 font-mono-game text-sm leading-relaxed">
-          The circuit must form <span className="text-primary glow-green">{puzzle.pattern.name}</span>.
-        </p>
+        <p className="text-foreground/80 font-mono-game text-sm leading-relaxed">{instructions}</p>
         <p className="text-muted-foreground font-mono-game text-xs mt-2">
-          Click any piece to rotate it 90°. Align all active nodes to complete the pattern.
+          When every wire is live, lock in the circuit.
         </p>
       </div>
 
-      {/* Grid */}
+      {/* Puzzle board */}
       <div
-        className="relative border border-primary/20 rounded-md p-2"
+        className="relative border border-primary/20 rounded-md p-3 flex items-center justify-center"
         style={{ background: "rgba(0,0,0,0.4)", boxShadow: "0 0 30px hsl(158 64% 52% / 0.05)" }}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${COLS}, 1fr)`,
-            gridTemplateRows: `repeat(${ROWS}, 1fr)`,
-            gap: "2px",
-          }}
-        >
-          {Array.from({ length: ROWS }, (_, row) =>
-            Array.from({ length: COLS }, (_, col) => {
-              const cell = getCell(col, row);
-              if (!cell) return null;
-              const src = isSource(col, row);
-              const dst = isDest(col, row);
-              const active = cell.inPath;
-              return (
-                <motion.div
-                  key={cell.id}
-                  className="relative cursor-pointer rounded-sm select-none"
-                  style={{
-                    width: "clamp(44px, 10vw, 62px)",
-                    height: "clamp(44px, 10vw, 62px)",
-                    background: active
-                      ? solved
-                        ? "hsl(158 64% 52% / 0.08)"
-                        : "hsl(158 64% 52% / 0.04)"
-                      : "hsl(220 18% 9% / 0.6)",
-                    border: active
-                      ? solved
-                        ? "1px solid hsl(158 64% 52% / 0.5)"
-                        : "1px solid hsl(158 64% 52% / 0.18)"
-                      : "1px solid hsl(220 15% 14% / 0.5)",
-                    transition: "background 0.3s, border 0.3s",
-                  }}
-                  animate={{ rotate: cell.currentRotation * 90 }}
-                  transition={{ type: "spring", stiffness: 320, damping: 22 }}
-                  onClick={() => active && handleCellClick(cell.id)}
-                  whileTap={active ? { scale: 0.88 } : {}}
-                >
-                  {active && (
-                    <PieceSVG
-                      typeKey={cell.typeKey}
-                      rotation={0} // rotation handled by parent motion.div
-                      solved={solved}
-                      isSource={src}
-                      isDest={dst}
-                    />
-                  )}
-                  {!active && (
-                    <div className="w-full h-full flex items-center justify-center opacity-10">
-                      <div className="w-1 h-1 rounded-full bg-foreground/20" />
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })
-          )}
-        </div>
+        {style === "wires" ? (
+          <WiresPuzzle onSolvedChange={onSolvedChange} locked={locked} />
+        ) : (
+          <FlowPuzzle onSolvedChange={onSolvedChange} locked={locked} />
+        )}
+      </div>
 
-        {/* Solved EKG overlay */}
-        <AnimatePresence>
-          {solved && (
-            <motion.div
+      {/* Lock-in button */}
+      <div className="mt-7 h-16 flex items-center justify-center">
+        <AnimatePresence mode="wait">
+          {!locked && solved && (
+            <motion.button
+              key="lock"
+              initial={{ opacity: 0, y: 12, scale: 0.9 }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                scale: 1,
+                boxShadow: [
+                  "0 0 14px hsl(158 64% 52% / 0.35)",
+                  "0 0 30px hsl(158 64% 52% / 0.7)",
+                  "0 0 14px hsl(158 64% 52% / 0.35)",
+                ],
+              }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ boxShadow: { duration: 1.6, repeat: Infinity }, default: { duration: 0.3 } }}
+              onClick={lockIn}
+              className="font-vt323 text-2xl tracking-[0.3em] uppercase px-8 py-3 rounded border border-primary text-primary"
+              style={{ background: "hsl(158 64% 52% / 0.08)", textShadow: "0 0 10px hsl(158 64% 52%)" }}
+            >
+              ⚡ Lock In
+            </motion.button>
+          )}
+          {locked && (
+            <motion.p
+              key="done"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="absolute inset-0 pointer-events-none rounded-md overflow-hidden"
+              className="font-mono-game text-sm text-primary glow-green tracking-widest uppercase"
             >
-              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <motion.path
-                  d="M5,50 L20,50 L25,20 L30,80 L35,35 L40,65 L45,50 L55,50 L60,50 L65,20 L70,80 L75,50 L95,50"
-                  fill="none"
-                  stroke="hsl(158 64% 52%)"
-                  strokeWidth="0.8"
-                  strokeLinecap="round"
-                  style={{ filter: "drop-shadow(0 0 3px hsl(158 64% 52% / 0.9))" }}
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: 1 }}
-                  transition={{ duration: 1.8, ease: "easeInOut" }}
-                  onAnimationComplete={() => setEkgDone(true)}
-                />
-              </svg>
-            </motion.div>
+              ✓ Circuit Locked — Boss Unlocked
+            </motion.p>
+          )}
+          {!locked && !solved && (
+            <motion.p
+              key="hint"
+              className="font-mono-game text-[11px] text-muted-foreground/30 tracking-widest text-center"
+              animate={{ opacity: [0.2, 0.5, 0.2] }}
+              transition={{ duration: 3, repeat: Infinity }}
+            >
+              connect every wire to power the circuit
+            </motion.p>
           )}
         </AnimatePresence>
       </div>
-
-      {/* Solved state — door appears */}
-      <AnimatePresence>
-        {solved && ekgDone && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="mt-8 flex flex-col items-center gap-4"
-          >
-            <p className="font-mono-game text-xs text-primary/70 tracking-widest">
-              ✓ CIRCUIT COMPLETE — BOSS FLOOR UNLOCKED
-            </p>
-
-            {/* Animated door */}
-            <motion.div
-              className="relative flex flex-col items-center justify-center cursor-pointer"
-              style={{
-                width: 90,
-                height: 130,
-                border: "2px solid hsl(158 64% 52%)",
-                borderRadius: "6px 6px 0 0",
-                background: "hsl(158 64% 52% / 0.05)",
-                boxShadow: "0 0 24px hsl(158 64% 52% / 0.4), inset 0 0 20px hsl(158 64% 52% / 0.05)",
-              }}
-              animate={{
-                boxShadow: [
-                  "0 0 24px hsl(158 64% 52% / 0.4)",
-                  "0 0 40px hsl(158 64% 52% / 0.7)",
-                  "0 0 24px hsl(158 64% 52% / 0.4)",
-                ],
-              }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-              onClick={() => onAdvance(floorData.nextFloor)}
-            >
-              {/* EKG line across door */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 90 130">
-                <motion.path
-                  d="M0,65 L20,65 L28,40 L36,90 L44,55 L52,65 L70,65 L90,65"
-                  fill="none"
-                  stroke="hsl(158 64% 52%)"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  style={{ filter: "drop-shadow(0 0 4px hsl(158 64% 52%))" }}
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: [0, 1, 1, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 0.4, ease: "easeInOut" }}
-                />
-              </svg>
-
-              {/* Door knob */}
-              <div
-                className="absolute right-3 rounded-full"
-                style={{
-                  width: 6, height: 6,
-                  background: "hsl(158 64% 52%)",
-                  boxShadow: "0 0 6px hsl(158 64% 52%)",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                }}
-              />
-
-              {/* ENTER text */}
-              <p
-                className="font-vt323 text-lg tracking-widest z-10 mt-2"
-                style={{ color: "hsl(158 64% 52%)", textShadow: "0 0 8px hsl(158 64% 52%)" }}
-              >
-                ENTER
-              </p>
-            </motion.div>
-
-            <p className="font-mono-game text-xs text-muted-foreground/40 tracking-widest">
-              tap the door to face the boss
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Ambient hint while unsolved */}
-      {!solved && (
-        <motion.p
-          className="mt-4 font-mono-game text-[10px] text-muted-foreground/20 tracking-widest text-center"
-          animate={{ opacity: [0.2, 0.5, 0.2] }}
-          transition={{ duration: 3, repeat: Infinity }}
-        >
-          rotate the active circuit pieces to form the correct pattern
-        </motion.p>
-      )}
     </motion.div>
   );
 }

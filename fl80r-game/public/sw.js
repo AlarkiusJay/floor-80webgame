@@ -1,7 +1,15 @@
-// Simple offline-first service worker for FL80R (a static SPA).
+// Simple offline-first service worker for FL80R (game + static /hub pages).
 // Bump CACHE to invalidate old caches on a breaking change.
-const CACHE = "fl80r-v1";
-const CORE = ["/", "/index.html", "/favicon.png", "/manifest.webmanifest"];
+const CACHE = "fl80r-v2";
+const CORE = [
+  "/",
+  "/index.html",
+  "/favicon.png",
+  "/manifest.webmanifest",
+  "/hub",
+  "/hub/faq.html",
+  "/hub/contributors.html",
+];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -28,17 +36,21 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // App navigations: network-first, fall back to the cached shell when offline.
+  // Navigations: network-first, caching each page under its own URL so both
+  // the game and the /hub pages work offline. Falls back to the game shell.
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req)
         .then((res) => {
           const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("/index.html", copy));
+          caches.open(CACHE).then((c) => c.put(req, copy));
           return res;
         })
         .catch(() =>
-          caches.match("/index.html").then((r) => r || caches.match("/"))
+          caches
+            .match(req)
+            .then((r) => r || caches.match("/index.html"))
+            .then((r) => r || caches.match("/"))
         )
     );
     return;

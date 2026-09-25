@@ -1,9 +1,10 @@
 {
+  "id": "/hub/",
   "name": "FL80R Hub",
   "short_name": "FL80R Hub",
   "description": "The FL80R hub — info, FAQ, contributors, and links for the browser puzzle & logic game.",
   "start_url": "/hub/",
-  "scope": "/hub/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#010101",
   "theme_color": "#010101",

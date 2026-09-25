@@ -1,7 +1,9 @@
 import { Home, Youtube } from "lucide-react";
 import MuteButton from "@/components/game/MuteButton";
 
-const HUB_URL = "https://www.fl80r.party/hub";
+// Same-origin, same-window navigation so it stays inside the installed PWA
+// (both the game and hub share scope "/") instead of opening an in-app browser.
+const HUB_URL = "/hub";
 const YOUTUBE_URL = "https://www.youtube.com/@Floor80Party";
 
 // Fixed top-left cluster: mute toggle + a link to the FL80R hub.
@@ -11,8 +13,6 @@ export default function TopLeftControls() {
       <MuteButton />
       <a
         href={HUB_URL}
-        target="_blank"
-        rel="noopener noreferrer"
         // Don't let the click bubble into the hold-to-continue handler.
         onPointerDown={(e) => e.stopPropagation()}
         aria-label="Open the FL80R hub"

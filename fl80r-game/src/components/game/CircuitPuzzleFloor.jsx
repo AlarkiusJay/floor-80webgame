@@ -386,10 +386,159 @@ function FlowPuzzle({ onSolvedChange, locked }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// STYLE 3 — PIPES (rotate the pipes / Net): rotate every tile so power from
+// the source reaches every pipe. Generated from a spanning tree, so it is
+// always solvable, and pipes light up as power flows.
+// ═══════════════════════════════════════════════════════════════════════════
+function rot1(p) {
+  return { N: p.W, E: p.N, S: p.E, W: p.S };
+}
+function rotN(p, n) {
+  let q = { ...p };
+  const t = ((n % 4) + 4) % 4;
+  for (let i = 0; i < t; i++) q = rot1(q);
+  return q;
+}
+
+function genPipes() {
+  const N = 4;
+  const cells = N * N;
+  const idx = (r, c) => r * N + c;
+  const ports = Array.from({ length: cells }, () => ({ N: false, E: false, S: false, W: false }));
+  const visited = new Array(cells).fill(false);
+  const start = Math.floor(Math.random() * cells);
+  const stack = [start];
+  visited[start] = true;
+  const DIRS = [
+    [-1, 0, "N", "S"],
+    [1, 0, "S", "N"],
+    [0, -1, "W", "E"],
+    [0, 1, "E", "W"],
+  ];
+  // randomized DFS spanning tree — connects every cell
+  while (stack.length) {
+    const cur = stack[stack.length - 1];
+    const r = Math.floor(cur / N), c = cur % N;
+    const opts = DIRS.map(([dr, dc, d, od]) => {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= N || nc < 0 || nc >= N) return null;
+      const ni = idx(nr, nc);
+      if (visited[ni]) return null;
+      return { ni, d, od };
+    }).filter(Boolean);
+    if (!opts.length) {
+      stack.pop();
+      continue;
+    }
+    const pick = opts[Math.floor(Math.random() * opts.length)];
+    ports[cur][pick.d] = true;
+    ports[pick.ni][pick.od] = true;
+    visited[pick.ni] = true;
+    stack.push(pick.ni);
+  }
+  return { N, ports, source: start };
+}
+
+function computePowered(N, eff, source) {
+  const seen = new Set([source]);
+  const st = [source];
+  while (st.length) {
+    const cur = st.pop();
+    const r = Math.floor(cur / N), c = cur % N;
+    const step = (cond, ni, d, od) => {
+      if (cond && !seen.has(ni) && eff[cur][d] && eff[ni][od]) {
+        seen.add(ni);
+        st.push(ni);
+      }
+    };
+    step(r > 0, cur - N, "N", "S");
+    step(r < N - 1, cur + N, "S", "N");
+    step(c > 0, cur - 1, "W", "E");
+    step(c < N - 1, cur + 1, "E", "W");
+  }
+  return seen;
+}
+
+function PipesPuzzle({ onSolvedChange, locked }) {
+  const puzzle = useMemo(() => genPipes(), []);
+  const { N, ports, source } = puzzle;
+  const cells = N * N;
+
+  const [rot, setRot] = useState(() => {
+    let r;
+    do {
+      r = Array.from({ length: cells }, () => Math.floor(Math.random() * 4));
+    } while (computePowered(N, ports.map((p, i) => rotN(p, r[i])), source).size === cells);
+    return r;
+  });
+
+  const eff = rot.map((rr, i) => rotN(ports[i], rr));
+  const powered = computePowered(N, eff, source);
+  const solved = powered.size === cells;
+
+  useEffect(() => {
+    onSolvedChange(solved);
+  }, [solved, onSolvedChange]);
+
+  const rotate = (i) => {
+    if (locked) return;
+    setRot((prev) => prev.map((v, j) => (j === i ? (v + 1) % 4 : v)));
+  };
+
+  const cellSize = "clamp(52px, 17vw, 72px)";
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${N}, 1fr)`, gap: 2 }}>
+      {Array.from({ length: cells }, (_, i) => {
+        const p = ports[i];
+        const isSrc = i === source;
+        const on = powered.has(i);
+        const col = isSrc ? "hsl(43 96% 56%)" : on ? "hsl(158 64% 52%)" : "hsl(158 64% 52% / 0.32)";
+        const lines = [];
+        if (p.N) lines.push("M20,20 L20,0");
+        if (p.S) lines.push("M20,20 L20,40");
+        if (p.E) lines.push("M20,20 L40,20");
+        if (p.W) lines.push("M20,20 L0,20");
+        return (
+          <motion.div
+            key={i}
+            onClick={() => rotate(i)}
+            className="rounded-sm select-none"
+            style={{
+              width: cellSize,
+              height: cellSize,
+              cursor: locked ? "default" : "pointer",
+              background: on ? "hsl(158 64% 52% / 0.06)" : "hsl(220 18% 9% / 0.6)",
+              border: `1px solid ${on ? "hsl(158 64% 52% / 0.4)" : "hsl(158 64% 52% / 0.12)"}`,
+              transition: "background .3s, border .3s",
+            }}
+            animate={{ rotate: rot[i] * 90 }}
+            transition={{ type: "spring", stiffness: 320, damping: 22 }}
+            whileTap={locked ? {} : { scale: 0.9 }}
+          >
+            <svg viewBox="0 0 40 40" width="100%" height="100%"
+              style={{ filter: on ? `drop-shadow(0 0 4px ${col})` : "none" }}>
+              {lines.map((d, k) => (
+                <path key={k} d={d} stroke={col} strokeWidth="3" strokeLinecap="round" fill="none" />
+              ))}
+              <circle cx="20" cy="20" r={isSrc ? 6 : 4} fill={isSrc ? col : on ? col : "hsl(158 64% 52% / 0.25)"}
+                stroke={col} strokeWidth={isSrc ? 1.5 : 0} />
+              {isSrc && <circle cx="20" cy="20" r="2" fill="#04120c" />}
+            </svg>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Main
 // ═══════════════════════════════════════════════════════════════════════════
 export default function CircuitPuzzleFloor({ floor, floorData, onAdvance }) {
-  const [style] = useState(() => (Math.random() < 0.5 ? "wires" : "flow"));
+  const [style] = useState(() => {
+    const styles = ["wires", "flow", "pipes"];
+    return styles[Math.floor(Math.random() * styles.length)];
+  });
   const [solved, setSolved] = useState(false);
   const [locked, setLocked] = useState(false);
 
@@ -419,7 +568,9 @@ export default function CircuitPuzzleFloor({ floor, floorData, onAdvance }) {
   const instructions =
     style === "wires"
       ? "Drag each node on the left to the matching-colour node on the right."
-      : "Drag from a glowing node to its matching pair. Connect every colour.";
+      : style === "flow"
+      ? "Drag from a glowing node to its matching pair. Connect every colour."
+      : "Tap each pipe to rotate it. Power must flow from the source to every pipe.";
 
   return (
     <motion.div
@@ -452,8 +603,10 @@ export default function CircuitPuzzleFloor({ floor, floorData, onAdvance }) {
       >
         {style === "wires" ? (
           <WiresPuzzle onSolvedChange={onSolvedChange} locked={locked} />
-        ) : (
+        ) : style === "flow" ? (
           <FlowPuzzle onSolvedChange={onSolvedChange} locked={locked} />
+        ) : (
+          <PipesPuzzle onSolvedChange={onSolvedChange} locked={locked} />
         )}
       </div>
 

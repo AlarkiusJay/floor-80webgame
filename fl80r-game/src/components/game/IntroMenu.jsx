@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, Cat, Star, X, Coffee, Github, RotateCw } from "lucide-react";
-import { setMusicVolume } from "@/lib/music";
+import { Settings, Cat, Star, X, Coffee, Github, RotateCw, Volume2, VolumeX } from "lucide-react";
+import { setMusicVolume, isMuted, setMuted } from "@/lib/music";
 
 const KOFI_URL = "https://ko-fi.com/alarkiusej/tiers";
 const ISSUES_URL = "https://github.com/AlarkiusJay/floor-80webgame/issues";
@@ -55,14 +55,17 @@ function Panel({ title, icon, onClose, children }) {
             <X size={18} />
           </button>
         </div>
-        {children}
+        {/* Scrollable body — the settings panel can get tall. */}
+        <div className="max-h-[68vh] overflow-y-auto pr-1 -mr-1">{children}</div>
       </motion.div>
     </motion.div>
   );
 }
 
-export default function IntroMenu() {
-  const [open, setOpen] = useState(null); // "settings" | "donate" | "credits" | null
+// variant: "intro" = top-right Settings + Donate cluster (main / how-to screens).
+//          "game"  = a single floating Settings gear, present on every floor 1-80.
+export default function IntroMenu({ variant = "intro" }) {
+  const [open, setOpen] = useState(null); // "settings" | "donate" | null
 
   const [volume, setVolume] = useState(() => {
     try {
@@ -81,6 +84,16 @@ export default function IntroMenu() {
       /* ignore storage errors (private mode, etc.) */
     }
   }, [volume]);
+
+  // Music mute toggle (persisted; applies whenever the theme plays).
+  const [muted, setMutedState] = useState(() => isMuted());
+  const toggleMute = useCallback(() => {
+    setMutedState((m) => {
+      const next = !m;
+      setMuted(next);
+      return next;
+    });
+  }, []);
 
   // Latest supporters (full list lives on the hub).
   const [contributors, setContributors] = useState([]);
@@ -115,6 +128,18 @@ export default function IntroMenu() {
     if (open !== "settings") setConfirmRefresh(false);
   }, [open]);
 
+  // Desktop power-shortcut: Shift + Ctrl + R reloads the run immediately.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === "R" || e.key === "r")) {
+        e.preventDefault();
+        window.location.reload();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const close = useCallback(() => setOpen(null), []);
 
   const NavButton = ({ id, icon, label }) => (
@@ -129,12 +154,26 @@ export default function IntroMenu() {
 
   return (
     <>
-      {/* Top-right controls */}
-      <div className="absolute top-4 right-4 z-30 flex gap-2">
-        <NavButton id="settings" icon={<Settings size={14} />} label="Settings" />
-        <NavButton id="donate" icon={<Cat size={14} />} label="Donate" />
-        <NavButton id="credits" icon={<Star size={14} />} label="Credits" />
-      </div>
+      {/* Trigger(s) */}
+      {variant === "game" ? (
+        // Floating gear, present on every floor. Bottom-right keeps it clear
+        // of the floor header and the hidden-cat spawn zone.
+        <div className="fixed bottom-4 right-4 z-[130]">
+          <button
+            onClick={() => setOpen("settings")}
+            aria-label="Settings"
+            title="Settings"
+            className="flex items-center justify-center w-11 h-11 rounded-full border border-primary/30 bg-black/50 text-primary/80 hover:text-primary hover:border-primary/70 hover:bg-primary/10 backdrop-blur-sm transition-all shadow-lg"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
+      ) : (
+        <div className="absolute top-4 right-4 z-30 flex gap-2">
+          <NavButton id="settings" icon={<Settings size={14} />} label="Settings" />
+          <NavButton id="donate" icon={<Cat size={14} />} label="Donate" />
+        </div>
+      )}
 
       <AnimatePresence>
         {open === "settings" && (
@@ -145,34 +184,102 @@ export default function IntroMenu() {
             onClose={close}
           >
             <div className="space-y-5 font-mono-game">
+              {/* ── Music ── */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label
                     htmlFor="music-vol"
                     className="text-xs text-foreground/70 tracking-widest uppercase"
                   >
-                    Music Volume
+                    Music
                   </label>
-                  <span className="text-xs text-primary tabular-nums">
+                  <button
+                    onClick={toggleMute}
+                    aria-label={muted ? "Unmute music" : "Mute music"}
+                    className="flex items-center gap-1.5 rounded border border-primary/25 bg-black/30 px-2 py-1 text-primary/70 hover:text-primary hover:border-primary/60 hover:bg-primary/5 transition-all text-[10px] tracking-widest uppercase"
+                  >
+                    {muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                    {muted ? "Muted" : "On"}
+                  </button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="music-vol"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volume}
+                    onChange={(e) => setVolume(Number(e.target.value))}
+                    className="w-full cursor-pointer"
+                    style={{ accentColor: "hsl(158 64% 52%)" }}
+                  />
+                  <span className="text-xs text-primary tabular-nums w-9 text-right">
                     {volume}%
                   </span>
                 </div>
-                <input
-                  id="music-vol"
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
-                  className="w-full cursor-pointer"
-                  style={{ accentColor: "hsl(158 64% 52%)" }}
-                />
+                <p className="mt-2 text-[11px] text-muted-foreground/70 leading-relaxed">
+                  🎵 Controls the main screen theme.
+                </p>
               </div>
 
-              <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-                🎵 Controls the main screen theme.
-              </p>
+              <div className="border-t border-border/40" />
 
+              {/* ── Meowspporters (credits + contributors) ── */}
+              <div className="text-center space-y-3">
+                <p className="text-[10px] text-muted-foreground tracking-[0.25em] uppercase">
+                  Meowspporters
+                </p>
+
+                {!contribLoaded ? (
+                  <p className="text-xs text-muted-foreground/50">Loading…</p>
+                ) : contributors.length === 0 ? (
+                  <p className="text-sm text-foreground/60 leading-relaxed italic px-2">
+                    The Cats are Purring. Come back Soon until Meowspporters have
+                    come~!
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {contributors.slice(0, LATEST_COUNT).map((c, i) => (
+                      <li key={(c.name || "") + i} className="text-sm text-primary/90">
+                        {c.name}
+                        {c.tier ? (
+                          <span className="text-muted-foreground/60 text-xs"> · {c.tier}</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {contribLoaded && contributors.length > 0 && (
+                  <a
+                    href={HUB_CONTRIBUTORS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-primary/70 hover:text-primary tracking-widest uppercase transition-colors"
+                  >
+                    See all supporters →
+                  </a>
+                )}
+
+                <div>
+                  <a
+                    href={KOFI_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded border border-primary/40 text-primary glow-green hover:bg-primary/10 hover:border-primary transition-all text-xs tracking-widest uppercase"
+                  >
+                    <Coffee size={14} />
+                    Support on Ko-fi
+                  </a>
+                  <p className="mt-2 text-[11px] text-muted-foreground/50 leading-relaxed">
+                    Every 10 floors, a cat demands tribute.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-border/40" />
+
+              {/* ── Bug / feature report ── */}
               <a
                 href={ISSUES_URL}
                 target="_blank"
@@ -186,8 +293,9 @@ export default function IntroMenu() {
                 </span>
               </a>
 
-              {isMobile &&
-                (!confirmRefresh ? (
+              {/* ── Refresh ── */}
+              {isMobile ? (
+                !confirmRefresh ? (
                   <button
                     onClick={() => setConfirmRefresh(true)}
                     className="flex w-full items-center justify-center gap-2 rounded border border-primary/25 bg-black/30 px-3 py-2.5 text-primary/70 hover:text-primary hover:border-primary/60 hover:bg-primary/5 transition-all text-xs tracking-widest uppercase"
@@ -214,7 +322,16 @@ export default function IntroMenu() {
                       </button>
                     </div>
                   </div>
-                ))}
+                )
+              ) : (
+                <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground/60 tracking-widest uppercase">
+                  <RotateCw size={12} />
+                  Refresh run:
+                  <kbd className="rounded border border-border px-1.5 py-0.5 text-[10px] text-foreground/70">
+                    Shift+Ctrl+R
+                  </kbd>
+                </p>
+              )}
 
               <p className="pt-1 text-center text-[10px] tracking-widest uppercase text-muted-foreground/70">
                 FL80R by Alarkius Elvya Jay
@@ -244,64 +361,6 @@ export default function IntroMenu() {
                 <Coffee size={16} />
                 Support on Ko-fi
               </a>
-            </div>
-          </Panel>
-        )}
-
-        {open === "credits" && (
-          <Panel
-            key="credits"
-            title="Credits"
-            icon={<Star size={16} />}
-            onClose={close}
-          >
-            <div className="space-y-4 font-mono-game text-center">
-              <p className="text-[10px] text-muted-foreground tracking-[0.25em] uppercase">
-                Latest Meowspporters
-              </p>
-
-              {!contribLoaded ? (
-                <p className="text-xs text-muted-foreground/50">Loading…</p>
-              ) : contributors.length === 0 ? (
-                <p className="text-sm text-foreground/60 leading-relaxed italic px-2">
-                  The Cats are Purring. Come back Soon until Meowspporters have
-                  come~!
-                </p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {contributors.slice(0, LATEST_COUNT).map((c, i) => (
-                    <li key={(c.name || "") + i} className="text-sm text-primary/90">
-                      {c.name}
-                      {c.tier ? (
-                        <span className="text-muted-foreground/60 text-xs"> · {c.tier}</span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {contribLoaded && contributors.length > 0 && (
-                <a
-                  href={HUB_CONTRIBUTORS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[11px] text-primary/70 hover:text-primary tracking-widest uppercase transition-colors"
-                >
-                  See all supporters →
-                </a>
-              )}
-
-              <div>
-                <a
-                  href={KOFI_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[11px] text-primary/60 hover:text-primary tracking-widest uppercase transition-colors"
-                >
-                  <Star size={12} />
-                  Become a Meowspporter
-                </a>
-              </div>
             </div>
           </Panel>
         )}

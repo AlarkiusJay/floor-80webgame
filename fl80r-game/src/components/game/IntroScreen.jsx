@@ -58,7 +58,7 @@ export default function IntroScreen({ onStart }) {
       {/* Top-left controls: mute toggle + hub link */}
       <TopLeftControls />
 
-      {/* Top-right menu: Settings / Donate / Credits */}
+      {/* Top-right menu: Settings (music, supporters, refresh) + Donate */}
       <IntroMenu />
 
       {/* Green ambient screen glow */}

@@ -10,6 +10,7 @@ import CatBossFloor from "@/components/game/CatBossFloor";
 import ChaseFloor from "@/components/game/ChaseFloor";
 import RickrollFloor from "@/components/game/RickrollFloor";
 import MasherFloor from "@/components/game/MasherFloor";
+import IntroMenu from "@/components/game/IntroMenu";
 import CircuitPuzzleFloor from "@/components/game/CircuitPuzzleFloor";
 import FinalFloor from "@/components/game/FinalFloor";
 import WinScreen from "@/components/game/WinScreen";
@@ -61,6 +62,9 @@ export default function Game() {
       className="min-h-screen scanlines transition-colors duration-700"
       style={{ backgroundColor: floorData?.bg || "#0a0f0d" }}
     >
+      {/* Settings gear — present on every floor 1-80 */}
+      <IntroMenu variant="game" />
+
       {/* Header */}
       <FloorHeader
         currentFloor={currentFloor}

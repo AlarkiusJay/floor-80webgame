@@ -222,5 +222,14 @@ export function generateFloors() {
     }
   }
 
+  // Copy any static half-floor interludes (e.g. "40.5", "60.5") verbatim.
+  // The main loop only builds integer floors 1–80, so these fixed bonus
+  // floors — reached via a boss floor's nextFloor — must be added explicitly.
+  for (const key of Object.keys(STATIC_FLOORS)) {
+    if (!(key in result)) {
+      result[key] = { ...STATIC_FLOORS[key] };
+    }
+  }
+
   return result;
 }

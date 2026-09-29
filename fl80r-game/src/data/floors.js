@@ -674,6 +674,14 @@ export const FLOORS = {
     type: "cat",
     bg: "#080505",
     description: "⚠ CRYPT BOSS ⚠\n\nA cat has crept into the crypts.\nFind it to unlock the next floor.",
+    nextFloor: "60.5",
+  },
+
+  "60.5": {
+    section: "Floors 51-60",
+    sectionTitle: "The Interlude",
+    type: "masher",
+    bg: "#080505",
     nextFloor: 61,
   },
 

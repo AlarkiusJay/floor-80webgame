@@ -9,6 +9,7 @@ import MathFloor from "@/components/game/MathFloor";
 import CatBossFloor from "@/components/game/CatBossFloor";
 import ChaseFloor from "@/components/game/ChaseFloor";
 import RickrollFloor from "@/components/game/RickrollFloor";
+import MasherFloor from "@/components/game/MasherFloor";
 import CircuitPuzzleFloor from "@/components/game/CircuitPuzzleFloor";
 import FinalFloor from "@/components/game/FinalFloor";
 import WinScreen from "@/components/game/WinScreen";
@@ -100,6 +101,13 @@ export default function Game() {
             )}
             {floorData?.type === "rickroll" && (
               <RickrollFloor onAdvance={handleAdvance} />
+            )}
+            {floorData?.type === "masher" && (
+              <MasherFloor
+                floor={currentFloor}
+                floorData={floorData}
+                onAdvance={handleAdvance}
+              />
             )}
             {floorData?.type === "circuit" && (
               <CircuitPuzzleFloor

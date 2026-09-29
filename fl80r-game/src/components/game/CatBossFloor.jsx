@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 
+const CAT_COUNT = 12; // public/cats/cat1.png … cat12.png
+
 export default function CatBossFloor({ floor, floorData, onAdvance }) {
   const [found, setFound] = useState(false);
 
@@ -9,6 +11,9 @@ export default function CatBossFloor({ floor, floorData, onAdvance }) {
     x: 8 + Math.random() * 80,
     y: 15 + Math.random() * 65,
   });
+
+  // Pick a random cat art for this floor (stable for the visit).
+  const catSrc = useRef(`/cats/cat${1 + Math.floor(Math.random() * CAT_COUNT)}.png`);
 
   const handleCatClick = () => {
     if (found) return;
@@ -52,17 +57,22 @@ export default function CatBossFloor({ floor, floorData, onAdvance }) {
         }}
         onClick={handleCatClick}
       >
-        <span
+        <img
+          src={catSrc.current}
+          alt=""
+          draggable={false}
           style={{
-            fontSize: "1.5rem",
-            opacity: found ? 1 : 0.04,
-            filter: found ? "drop-shadow(0 0 12px hsl(158 64% 52%))" : "none",
-            transition: "opacity 0.3s, filter 0.3s",
+            display: "block",
+            width: "clamp(80px, 14vw, 130px)",
+            height: "auto",
+            opacity: found ? 1 : 0.05,
+            filter: found
+              ? "drop-shadow(0 0 16px hsl(158 64% 52%)) drop-shadow(0 0 40px hsl(158 64% 52%))"
+              : "none",
+            transition: "opacity 0.35s, filter 0.35s",
             userSelect: "none",
           }}
-        >
-          🐱
-        </span>
+        />
       </div>
 
       {/* Ambient hint */}

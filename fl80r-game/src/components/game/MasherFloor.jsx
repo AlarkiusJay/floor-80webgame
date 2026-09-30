@@ -35,7 +35,6 @@ const TAUNTS = [
   "right-click harder.",
   "was that supposed to work?",
 ];
-const FAKE_ITEMS = ["Inspect Element", "Catch the button", "Beg for mercy", "Give up"];
 
 export default function MasherFloor({ floorData, onAdvance }) {
   const targets = useRef(BUTTONS.map(rollTarget));
@@ -390,39 +389,26 @@ export default function MasherFloor({ floorData, onAdvance }) {
         {menu && (
           <motion.div
             key={`${menu.x}-${menu.y}-${menu.text}`}
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.92 }}
+            initial={{ opacity: 0, scale: 0.9, y: 3 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.12 }}
-            className="fixed z-[220] font-mono-game text-xs"
+            className="fixed z-[220] font-mono-game"
             style={{
-              left: Math.min(menu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 200),
-              top: Math.min(menu.y, (typeof window !== "undefined" ? window.innerHeight : 9999) - 170),
+              left: Math.min(menu.x + 8, (typeof window !== "undefined" ? window.innerWidth : 9999) - 180),
+              top: Math.min(menu.y + 8, (typeof window !== "undefined" ? window.innerHeight : 9999) - 40),
               pointerEvents: "none",
             }}
           >
             <div
-              className="w-48 rounded-md border overflow-hidden"
+              className="rounded border px-2.5 py-1 text-[11px] tracking-wide whitespace-nowrap text-primary/90 glow-green"
               style={{
                 borderColor: "hsl(158 64% 52% / 0.4)",
                 backgroundColor: "#050807",
-                boxShadow: "0 0 20px hsl(158 64% 52% / 0.25)",
+                boxShadow: "0 0 14px hsl(158 64% 52% / 0.25)",
               }}
             >
-              <div className="px-3 py-1.5 text-[10px] tracking-[0.25em] uppercase text-primary/80 glow-green border-b border-primary/20">
-                » {menu.text}
-              </div>
-              <div className="py-1">
-                {FAKE_ITEMS.map((it) => (
-                  <div
-                    key={it}
-                    className="flex items-center justify-between px-3 py-1.5 text-muted-foreground/45 tracking-wide"
-                  >
-                    <span>{it}</span>
-                    <span className="text-destructive/60">✗</span>
-                  </div>
-                ))}
-              </div>
+              » {menu.text}
             </div>
           </motion.div>
         )}

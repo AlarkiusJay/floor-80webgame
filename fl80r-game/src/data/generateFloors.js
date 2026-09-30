@@ -1,4 +1,6 @@
-import { TYPED_RIDDLES, MATH_RIDDLES, HIDDEN_RIDDLES, CHASE_RIDDLES } from "./riddleBank.js";
+import { TYPED_RIDDLES, HIDDEN_RIDDLES, CHASE_RIDDLES } from "./riddleBank.js";
+import { STORY_MATH_RIDDLES, CHAIN_SAFE_RIDDLES } from "./storyMathRiddles.js";
+import { clockAnswer } from "@/lib/answers.js";
 import { FLOORS as STATIC_FLOORS } from "./floors.js";
 
 // ─────────────────────────────────────────────
@@ -58,8 +60,21 @@ function pickN(arr, n) {
   return shuffle(arr).slice(0, n);
 }
 
-// Memory floor floors (5 of them in non-boss floors)
-const MEMORY_FLOOR_POSITIONS = [25, 45, 55, 68, 77];
+// Fixed memory-floor chain. Each memory floor consumes an integer answer the
+// player earned at an earlier, force-spawned "source" math floor.
+//   kind "recall" -> re-enter the number you carried up.
+//   kind "clock"  -> add the carried minutes to a base time.
+// Source floors are math-pattern floors (the "…4" in each 9-floor zone), placed
+// far enough ahead to satisfy the gap (floor 45: >=13; floor 77: >=40).
+const MEMORY_CHAIN = [
+  { floor: 25, source: 14, kind: "recall" },
+  { floor: 45, source: 24, kind: "clock", baseHH: 22, baseMM: 0 },
+  { floor: 55, source: 44, kind: "recall" },
+  { floor: 68, source: 54, kind: "recall" },
+  { floor: 77, source: 34, kind: "clock", baseHH: 20, baseMM: 17 },
+];
+const MEMORY_FLOORS = new Set(MEMORY_CHAIN.map((m) => m.floor));
+const SOURCE_FLOORS = new Set(MEMORY_CHAIN.map((m) => m.source));
 
 // Circuit puzzle floors appear right before each boss (floors 9, 19, 29, 39, 49, 59, 69)
 const CIRCUIT_FLOOR_POSITIONS = new Set([9, 19, 29, 39, 49, 59, 69]);
@@ -67,16 +82,52 @@ const CIRCUIT_FLOOR_POSITIONS = new Set([9, 19, 29, 39, 49, 59, 69]);
 export function generateFloors() {
   // Shuffle riddle pools
   const typedPool  = shuffle(TYPED_RIDDLES);
-  const mathPool   = shuffle(MATH_RIDDLES);
   const hiddenPool = shuffle(HIDDEN_RIDDLES);
   const chasePool  = shuffle(CHASE_RIDDLES);
 
+  const tierForFloor = (f) => (f <= 25 ? 1 : f <= 55 ? 2 : 3);
+
+  // Assign each memory chain a distinct chain-safe source riddle, preferring the
+  // source floor's tier. Clock chains keep the carried minutes sane (<= 200).
+  const usedSourceIds = new Set();
+  const pickSource = (sourceFloor, clock) => {
+    const tier = tierForFloor(sourceFloor);
+    const ok = (r) =>
+      !usedSourceIds.has(r.id) && (!clock || (r.chainValue >= 1 && r.chainValue <= 200));
+    const pools = [
+      shuffle(CHAIN_SAFE_RIDDLES.filter((r) => r.tier === tier)),
+      shuffle(CHAIN_SAFE_RIDDLES),
+    ];
+    for (const pool of pools) {
+      const found = pool.find(ok);
+      if (found) { usedSourceIds.add(found.id); return found; }
+    }
+    const any = CHAIN_SAFE_RIDDLES.find((r) => !usedSourceIds.has(r.id)) || CHAIN_SAFE_RIDDLES[0];
+    usedSourceIds.add(any.id);
+    return any;
+  };
+  const sourceByFloor = {}; // source floor -> chosen riddle
+  const memoryByFloor = {}; // memory floor -> { spec, src }
+  for (const spec of MEMORY_CHAIN) {
+    const src = pickSource(spec.source, spec.kind === "clock");
+    sourceByFloor[spec.source] = src;
+    memoryByFloor[spec.floor] = { spec, src };
+  }
+
+  // Story-math pools per tier (excluding riddles already claimed as sources so a
+  // run never shows the same riddle twice).
+  const mathTiers = {
+    1: shuffle(STORY_MATH_RIDDLES.filter((r) => r.tier === 1 && !usedSourceIds.has(r.id))),
+    2: shuffle(STORY_MATH_RIDDLES.filter((r) => r.tier === 2 && !usedSourceIds.has(r.id))),
+    3: shuffle(STORY_MATH_RIDDLES.filter((r) => r.tier === 3 && !usedSourceIds.has(r.id))),
+  };
+  const mathIdxByTier = { 1: 0, 2: 0, 3: 0 };
+
   let typedIdx  = 0;
-  let mathIdx   = 0;
   let hiddenIdx = 0;
   let chaseIdx  = 0;
 
-  // We'll collect all floor answers as we generate, so memory floors can reference them
+  // Collected answers (unused by the new memory chain, kept for possible refs)
   const floorAnswers = {}; // floorNum -> answer string
 
   // Decide floor type assignment for non-boss, non-memory floors
@@ -107,41 +158,37 @@ export function generateFloors() {
       continue;
     }
 
-    // Memory floors: reference a previously generated floor's answer
-    if (MEMORY_FLOOR_POSITIONS.includes(f)) {
-      // Pick a past non-boss floor that has an answer
-      const pastFloors = Object.keys(floorAnswers).map(Number).filter(n => n < f);
-      const refFloor = pastFloors.length > 0
-        ? pastFloors[Math.floor(Math.random() * pastFloors.length)]
-        : null;
+    // Fixed memory floors: consume the number earned at an earlier source floor.
+    if (MEMORY_FLOORS.has(f)) {
+      const { spec, src } = memoryByFloor[f];
+      const carried = src.chainValue;
+      const base = { ...meta, bg, nextFloor, type: "memory", sourceFloor: spec.source, carried };
 
-      // Pick a new riddle for the second part
-      const secondRiddle = typedPool[typedIdx % typedPool.length];
-      typedIdx++;
-
-      result[f] = {
-        ...meta,
-        type: "typed",
-        bg,
-        nextFloor,
-        description: refFloor
-          ? `A mysterious figure steps forward.\n\n'You've come far. Tell me — on Floor ${refFloor}, what was the answer?'`
-          : `A mysterious figure steps forward.\n\n'Impressive. Solve this riddle to continue:\n\n${secondRiddle.description}'`,
-        clue: refFloor
-          ? `What did you answer on Floor ${refFloor}?`
-          : secondRiddle.clue,
-        memoryFloor: refFloor || undefined,
-        memoryAnswer: refFloor ? floorAnswers[refFloor] : undefined,
-        secondRiddle: refFloor ? {
-          description: secondRiddle.description,
-          clue: secondRiddle.clue,
-          answer: secondRiddle.answer,
-        } : undefined,
-        answer: refFloor ? undefined : secondRiddle.answer,
-      };
-
-      if (!refFloor) {
-        floorAnswers[f] = secondRiddle.answer;
+      if (spec.kind === "clock") {
+        const { accepts, display } = clockAnswer(spec.baseHH, spec.baseMM, carried);
+        const baseLabel = clockAnswer(spec.baseHH, spec.baseMM, 0).display;
+        result[f] = f === 45
+          ? {
+              ...base, kind: "clock", accepts, answer: display,
+              description: `It is night, and the building has locked its memory around you.\n\nSteven is late - caught past the ${baseLabel} curfew. He crossed the lobby the exact number of minutes you carried up from Floor ${spec.source} late.\n\nWhat time did Steven finally slink in?`,
+              clue: "Enter the time (e.g. 11:03 PM).",
+              hint: `${baseLabel} + ${carried} minutes = ${display}.`,
+            }
+          : {
+              ...base, kind: "clock", accepts, answer: display,
+              description: `The tower's midnight screening of "Once Upon a Time in Hollywood (2019)" began at ${baseLabel}.\n\nIt ran the exact number of minutes you carried up from Floor ${spec.source}. When did the credits finally roll?`,
+              clue: "Enter the time (e.g. 11:29 PM).",
+              hint: `${baseLabel} + ${carried} minutes = ${display}.`,
+            };
+      } else {
+        result[f] = {
+          ...base, kind: "recall",
+          description: `A figure blocks the stairwell, palm out.\n\n"Back on Floor ${spec.source}, you solved a riddle and I told you to keep the number. Prove it - what number did you carry?"`,
+          clue: "Enter the number you answered on that floor.",
+          accepts: src.accepts,
+          answer: src.answer,
+          hint: `The answer you gave on Floor ${spec.source} was ${src.answer}.`,
+        };
       }
       continue;
     }
@@ -174,17 +221,31 @@ export function generateFloors() {
       floorAnswers[f] = riddle.answer;
 
     } else if (floorType === "math") {
-      const riddle = mathPool[mathIdx % mathPool.length];
-      mathIdx++;
+      // Source floors serve the pre-assigned chain-safe riddle plus the
+      // "remember" line; every other math floor draws from its tier pool.
+      let riddle;
+      let remember = false;
+      if (SOURCE_FLOORS.has(f)) {
+        riddle = sourceByFloor[f];
+        remember = true;
+      } else {
+        const tier = tierForFloor(f);
+        const pool = mathTiers[tier];
+        riddle = pool[mathIdxByTier[tier]++ % pool.length];
+      }
       result[f] = {
         ...meta,
         type: "math",
         bg,
         nextFloor,
-        description: riddle.description,
-        clue: riddle.clue,
+        story: true,
+        description: remember
+          ? `${riddle.description}\n\n> Keep the number. The building keeps grudges; you keep answers.`
+          : riddle.description,
+        clue: "Story Riddle - enter your answer (digits or words).",
         hint: riddle.hint,
         answer: riddle.answer,
+        accepts: riddle.accepts,
       };
       floorAnswers[f] = riddle.answer;
 

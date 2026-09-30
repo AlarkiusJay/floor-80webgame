@@ -80,14 +80,14 @@ export default function MasherFloor({ floorData, onAdvance }) {
     setMenu(null);
     clearTimeout(freezeTimer.current);
     clearTimeout(menuTimer.current);
-  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [idx]);  
 
   // "Leaky" drain: lose 1/sec while this button is active.
   useEffect(() => {
     if (done || btn.mod !== "leaky") return;
     const t = setInterval(() => setCount((c) => Math.max(0, c - 1)), 1000);
     return () => clearInterval(t);
-  }, [idx, done]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [idx, done]);  
 
   const advanceButton = useCallback(() => {
     if (idx + 1 >= BUTTONS.length) {

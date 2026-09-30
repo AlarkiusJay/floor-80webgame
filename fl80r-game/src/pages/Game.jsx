@@ -10,6 +10,7 @@ import CatBossFloor from "@/components/game/CatBossFloor";
 import ChaseFloor from "@/components/game/ChaseFloor";
 import RickrollFloor from "@/components/game/RickrollFloor";
 import MasherFloor from "@/components/game/MasherFloor";
+import MemoryFloor from "@/components/game/MemoryFloor";
 import IntroMenu from "@/components/game/IntroMenu";
 import CircuitPuzzleFloor from "@/components/game/CircuitPuzzleFloor";
 import FinalFloor from "@/components/game/FinalFloor";
@@ -98,6 +99,13 @@ export default function Game() {
             )}
             {floorData?.type === "math" && (
               <MathFloor
+                floor={currentFloor}
+                floorData={floorData}
+                onAdvance={handleAdvance}
+              />
+            )}
+            {floorData?.type === "memory" && (
+              <MemoryFloor
                 floor={currentFloor}
                 floorData={floorData}
                 onAdvance={handleAdvance}

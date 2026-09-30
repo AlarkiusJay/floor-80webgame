@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { motion, useAnimation } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import OpeningIntro from "@/components/game/OpeningIntro";
 import IntroMenu from "@/components/game/IntroMenu";
 import TopLeftControls from "@/components/game/TopLeftControls";

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, Cat, Star, X, Coffee, Github, RotateCw, Volume2, VolumeX } from "lucide-react";
+import { Settings, Cat, X, Coffee, Github, RotateCw, Volume2, VolumeX } from "lucide-react";
 import { setMusicVolume, isMuted, setMuted } from "@/lib/music";
 
 const KOFI_URL = "https://ko-fi.com/alarkiusej/tiers";

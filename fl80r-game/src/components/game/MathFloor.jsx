@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { matchesAnswer } from "@/lib/answers";
 
 // Step 1: Solve math → Step 2: Hunt for hidden EXIT anywhere on screen
 export default function MathFloor({ floor, floorData, onAdvance }) {
@@ -16,9 +17,7 @@ export default function MathFloor({ floor, floorData, onAdvance }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const normalized = input.trim().toLowerCase();
-    const correct = String(floorData.answer).toLowerCase();
-    if (normalized === correct) {
+    if (matchesAnswer(input, floorData.accepts, floorData.answer)) {
       setStatus("solved");
       setInput("");
     } else {
@@ -55,11 +54,16 @@ export default function MathFloor({ floor, floorData, onAdvance }) {
             transition={{ duration: 0.5 }}
             className="max-w-2xl mx-auto px-4 py-8 space-y-8"
           >
-            {/* Math badge */}
-            <div className="flex items-center gap-2">
+            {/* Math badge + Story Riddle pill */}
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-accent glow-amber font-mono-game text-xs tracking-widest uppercase border border-accent/30 rounded px-2 py-1">
                 ∑ Math Challenge
               </span>
+              {floorData.story && (
+                <span className="text-primary glow-green font-mono-game text-xs tracking-widest uppercase border border-primary/30 rounded px-2 py-1">
+                  ⌂ Story Riddle
+                </span>
+              )}
             </div>
 
             {/* Puzzle */}

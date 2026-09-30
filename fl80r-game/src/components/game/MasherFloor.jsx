@@ -20,6 +20,23 @@ const BUTTONS = [
 const rollTarget = () => 50 + Math.floor(Math.random() * 80);
 const randPos = () => ({ x: 15 + Math.random() * 70, y: 20 + Math.random() * 60 });
 
+// Taunts for the custom right-click menu on the runaway button.
+const TAUNTS = [
+  "nice try.",
+  "you really thought?",
+  "the button laughs at you.",
+  "cute. keep going.",
+  "not in this building.",
+  "it sees your cursor.",
+  "pinned. now be quick.",
+  "so close. not really.",
+  "skill issue, honestly.",
+  "the cats are watching.",
+  "right-click harder.",
+  "was that supposed to work?",
+];
+const FAKE_ITEMS = ["Inspect Element", "Catch the button", "Beg for mercy", "Give up"];
+
 export default function MasherFloor({ floorData, onAdvance }) {
   const targets = useRef(BUTTONS.map(rollTarget));
   const [idx, setIdx] = useState(0);
@@ -29,10 +46,24 @@ export default function MasherFloor({ floorData, onAdvance }) {
   const [shake, setShake] = useState(0); // increments to trigger a "miss" shake
   const [pressed, setPressed] = useState(false); // brief press-dip feedback
   const [done, setDone] = useState(false);
+  const [frozen, setFrozen] = useState(false); // runaway pinned by a right-click
+  const [menu, setMenu] = useState(null); // { x, y, text } custom right-click menu
   const arenaRef = useRef(null);
+  const freezeTimer = useRef(null);
+  const menuTimer = useRef(null);
   const isCoarse = useRef(false);
+  const [coarse, setCoarse] = useState(false);
   useEffect(() => {
-    try { isCoarse.current = window.matchMedia("(pointer: coarse)").matches; } catch { /* ignore */ }
+    let c = false;
+    try { c = window.matchMedia("(pointer: coarse)").matches; } catch { /* ignore */ }
+    isCoarse.current = c;
+    setCoarse(c);
+  }, []);
+
+  // Clean up timers on unmount.
+  useEffect(() => () => {
+    clearTimeout(freezeTimer.current);
+    clearTimeout(menuTimer.current);
   }, []);
 
   const btn = BUTTONS[idx];
@@ -44,6 +75,10 @@ export default function MasherFloor({ floorData, onAdvance }) {
   useEffect(() => {
     setCount(0);
     setPos(btn.mod === "jumpy" || btn.mod === "runaway" ? randPos() : { x: 50, y: 50 });
+    setFrozen(false);
+    setMenu(null);
+    clearTimeout(freezeTimer.current);
+    clearTimeout(menuTimer.current);
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Leaky" drain: lose 1/sec while this button is active.
@@ -129,10 +164,10 @@ export default function MasherFloor({ floorData, onAdvance }) {
     }
   }, []);
 
-  // "Runaway" dodge (desktop hover).
+  // "Runaway" dodge (desktop hover). Frozen = pinned by a right-click.
   const onArenaMove = useCallback(
     (e) => {
-      if (btn.mod !== "runaway" || isCoarse.current || done) return;
+      if (btn.mod !== "runaway" || isCoarse.current || done || frozen) return;
       const arena = arenaRef.current;
       if (!arena) return;
       const r = arena.getBoundingClientRect();
@@ -141,7 +176,29 @@ export default function MasherFloor({ floorData, onAdvance }) {
       const dist = Math.hypot(mx - pos.x, my - pos.y);
       if (dist < 22) setPos(randPos());
     },
-    [btn.mod, pos, done]
+    [btn.mod, pos, done, frozen]
+  );
+
+  // Custom right-click: swallow the OS menu, taunt the player, and — on the
+  // runaway button — pin it in place for ~1.3s so it can actually be caught.
+  const onContextMenu = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (done) return;
+      if (btn.mod === "runaway") {
+        setFrozen(true);
+        clearTimeout(freezeTimer.current);
+        freezeTimer.current = setTimeout(() => setFrozen(false), 1300);
+      }
+      setMenu({
+        x: e.clientX,
+        y: e.clientY,
+        text: TAUNTS[Math.floor(Math.random() * TAUNTS.length)],
+      });
+      clearTimeout(menuTimer.current);
+      menuTimer.current = setTimeout(() => setMenu(null), 1400);
+    },
+    [btn.mod, done]
   );
 
   const pct = Math.round((count / target) * 100);
@@ -152,6 +209,7 @@ export default function MasherFloor({ floorData, onAdvance }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
+      onContextMenu={onContextMenu}
       className="max-w-2xl mx-auto px-4 py-8 space-y-6"
     >
       {/* Badge */}
@@ -210,6 +268,11 @@ export default function MasherFloor({ floorData, onAdvance }) {
             <p className="font-mono-game text-[11px] text-muted-foreground/50 tracking-widest uppercase">
               button {idx + 1} / {BUTTONS.length} · modifier: {btn.mod} — {btn.quip}
             </p>
+            {btn.mod === "runaway" && !coarse && (
+              <p className="font-mono-game text-[11px] text-accent/80 glow-amber tracking-widest">
+                psst — right-clicking might help.
+              </p>
+            )}
           </div>
 
           {/* Animated counter */}
@@ -270,17 +333,24 @@ export default function MasherFloor({ floorData, onAdvance }) {
                   tabIndex={-1}
                   animate={{ scale: pressScale }}
                   transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                  className="select-none font-vt323 tracking-widest rounded-md border-2 px-6 py-4 text-2xl"
+                  className="relative select-none font-vt323 tracking-widest rounded-md border-2 px-6 py-4 text-2xl"
                   style={{
-                    color: btn.color,
-                    borderColor: btn.color,
+                    color: frozen ? "hsl(158 64% 52%)" : btn.color,
+                    borderColor: frozen ? "hsl(158 64% 52%)" : btn.color,
                     backgroundColor: `${btn.color}1a`,
-                    boxShadow: `0 0 18px ${btn.color}66, inset 0 0 12px ${btn.color}22`,
+                    boxShadow: frozen
+                      ? "0 0 26px hsl(158 64% 52% / 0.8), inset 0 0 16px hsl(158 64% 52% / 0.35)"
+                      : `0 0 18px ${btn.color}66, inset 0 0 12px ${btn.color}22`,
                     cursor: "pointer",
                     WebkitTapHighlightColor: "transparent",
                   }}
                 >
                   {btn.label}
+                  {frozen && (
+                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] tracking-[0.3em] text-primary glow-green">
+                      PINNED
+                    </span>
+                  )}
                 </motion.button>
               </motion.div>
             </motion.div>
@@ -291,6 +361,49 @@ export default function MasherFloor({ floorData, onAdvance }) {
           </p>
         </>
       )}
+
+      {/* Custom right-click menu — themed, taunty, purely decorative (no OS menu). */}
+      <AnimatePresence>
+        {menu && (
+          <motion.div
+            key={`${menu.x}-${menu.y}-${menu.text}`}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ duration: 0.12 }}
+            className="fixed z-[220] font-mono-game text-xs"
+            style={{
+              left: Math.min(menu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 200),
+              top: Math.min(menu.y, (typeof window !== "undefined" ? window.innerHeight : 9999) - 170),
+              pointerEvents: "none",
+            }}
+          >
+            <div
+              className="w-48 rounded-md border overflow-hidden"
+              style={{
+                borderColor: "hsl(158 64% 52% / 0.4)",
+                backgroundColor: "#050807",
+                boxShadow: "0 0 20px hsl(158 64% 52% / 0.25)",
+              }}
+            >
+              <div className="px-3 py-1.5 text-[10px] tracking-[0.25em] uppercase text-primary/80 glow-green border-b border-primary/20">
+                » {menu.text}
+              </div>
+              <div className="py-1">
+                {FAKE_ITEMS.map((it) => (
+                  <div
+                    key={it}
+                    className="flex items-center justify-between px-3 py-1.5 text-muted-foreground/45 tracking-wide"
+                  >
+                    <span>{it}</span>
+                    <span className="text-destructive/60">✗</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

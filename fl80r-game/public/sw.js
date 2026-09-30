@@ -1,6 +1,6 @@
 // Simple offline-first service worker for FL80R (game + static /hub pages).
 // Bump CACHE to invalidate old caches on a breaking change.
-const CACHE = "fl80r-v2";
+const CACHE = "fl80r-v3";
 const CORE = [
   "/",
   "/index.html",

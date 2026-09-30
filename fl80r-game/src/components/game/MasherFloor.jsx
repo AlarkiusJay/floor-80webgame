@@ -27,6 +27,7 @@ export default function MasherFloor({ floorData, onAdvance }) {
   const [pos, setPos] = useState({ x: 50, y: 50 });
   const [bump, setBump] = useState(0);   // increments to re-key the counter pop
   const [shake, setShake] = useState(0); // increments to trigger a "miss" shake
+  const [pressed, setPressed] = useState(false); // brief press-dip feedback
   const [done, setDone] = useState(false);
   const arenaRef = useRef(null);
   const isCoarse = useRef(false);
@@ -37,6 +38,7 @@ export default function MasherFloor({ floorData, onAdvance }) {
   const btn = BUTTONS[idx];
   const target = targets.current[idx];
   const shrinkScale = btn.mod === "shrink" ? Math.max(0.45, 1 - (count / target) * 0.6) : 1;
+  const pressScale = shrinkScale * (pressed ? 0.92 : 1);
 
   // Reset per-button state when moving to a new button.
   useEffect(() => {
@@ -80,20 +82,52 @@ export default function MasherFloor({ floorData, onAdvance }) {
     [btn.mod, target, done, advanceButton]
   );
 
-  // Primary click handler (single-click mods).
-  const onClick = useCallback(() => {
-    if (btn.mod === "double") return; // handled by onDoubleClick
-    if (btn.mod === "flaky" && Math.random() < 0.25) {
-      setShake((s) => s + 1);
-      return;
-    }
-    addHit(btn.mod === "turbo" ? 3 : 1);
-  }, [btn.mod, addHit]);
+  // Count on discrete pointer presses only. Using pointerdown (not click)
+  // means one count per physical press: holding the mouse or holding Enter
+  // (keyboard activation fires "click", never "pointerdown") can't auto-spam.
+  const lastTap = useRef(0);
+  const onPress = useCallback(
+    (e) => {
+      if (done) return;
+      // Only genuine pointer input counts. Keyboard-synthesized presses report
+      // an empty pointerType (or aren't trusted) — reject them so holding Enter
+      // or Space can never auto-spam.
+      if (!e.isTrusted) return;
+      if (!["mouse", "touch", "pen"].includes(e.pointerType)) return;
+      if (e.button != null && e.button > 0) return; // ignore right/middle click
 
-  const onDouble = useCallback(() => {
-    if (btn.mod !== "double") return;
-    addHit(1);
-  }, [btn.mod, addHit]);
+      // Brief press-dip for tactile feel (was whileTap, which added a
+      // keyboard-activation path we don't want here).
+      setPressed(true);
+      setTimeout(() => setPressed(false), 90);
+
+      if (btn.mod === "double") {
+        // Require two quick presses to score one (the "double-click" button).
+        const now = e.timeStamp || performance.now();
+        if (now - lastTap.current <= 400) {
+          lastTap.current = 0;
+          addHit(1);
+        } else {
+          lastTap.current = now;
+        }
+        return;
+      }
+
+      if (btn.mod === "flaky" && Math.random() < 0.25) {
+        setShake((s) => s + 1);
+        return;
+      }
+      addHit(btn.mod === "turbo" ? 3 : 1);
+    },
+    [btn.mod, addHit, done]
+  );
+
+  // Swallow keyboard activation so a focused button can't be Enter/Space-spammed.
+  const blockKey = useCallback((e) => {
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+    }
+  }, []);
 
   // "Runaway" dodge (desktop hover).
   const onArenaMove = useCallback(
@@ -231,11 +265,11 @@ export default function MasherFloor({ floorData, onAdvance }) {
                 {/* Layer 3: the button itself (scale = shrink modifier + tap feedback) */}
                 <motion.button
                   type="button"
-                  onClick={onClick}
-                  onDoubleClick={onDouble}
-                  animate={{ scale: shrinkScale }}
-                  transition={{ type: "spring", stiffness: 400, damping: 22 }}
-                  whileTap={{ scale: shrinkScale * 0.9 }}
+                  onPointerDown={onPress}
+                  onKeyDown={blockKey}
+                  tabIndex={-1}
+                  animate={{ scale: pressScale }}
+                  transition={{ type: "spring", stiffness: 500, damping: 20 }}
                   className="select-none font-vt323 tracking-widest rounded-md border-2 px-6 py-4 text-2xl"
                   style={{
                     color: btn.color,

@@ -47,6 +47,7 @@ export default function MasherFloor({ floorData, onAdvance }) {
   const [pressed, setPressed] = useState(false); // brief press-dip feedback
   const [done, setDone] = useState(false);
   const [frozen, setFrozen] = useState(false); // runaway pinned by a right-click
+  const [armed, setArmed] = useState(false); // right-click arms exactly one catch
   const [menu, setMenu] = useState(null); // { x, y, text } custom right-click menu
   const arenaRef = useRef(null);
   const freezeTimer = useRef(null);
@@ -76,6 +77,7 @@ export default function MasherFloor({ floorData, onAdvance }) {
     setCount(0);
     setPos(btn.mod === "jumpy" || btn.mod === "runaway" ? randPos() : { x: 50, y: 50 });
     setFrozen(false);
+    setArmed(false);
     setMenu(null);
     clearTimeout(freezeTimer.current);
     clearTimeout(menuTimer.current);
@@ -110,8 +112,14 @@ export default function MasherFloor({ floorData, onAdvance }) {
         }
         return next;
       });
-      if (btn.mod === "jumpy" || (btn.mod === "runaway" && isCoarse.current)) {
+      // Runaway repels on every landed hit: it flees to a new spot and the
+      // pin drops immediately, so a right-click only ever buys ONE click.
+      if (btn.mod === "jumpy" || btn.mod === "runaway") {
         setPos(randPos());
+      }
+      if (btn.mod === "runaway") {
+        clearTimeout(freezeTimer.current);
+        setFrozen(false);
       }
     },
     [btn.mod, target, done, advanceButton]
@@ -148,13 +156,22 @@ export default function MasherFloor({ floorData, onAdvance }) {
         return;
       }
 
+      if (btn.mod === "runaway") {
+        // Only a right-click-armed catch scores; consume it so one right-click
+        // buys exactly one hit no matter how fast you click.
+        if (!armed) return;
+        setArmed(false);
+        addHit(1);
+        return;
+      }
+
       if (btn.mod === "flaky" && Math.random() < 0.25) {
         setShake((s) => s + 1);
         return;
       }
       addHit(btn.mod === "turbo" ? 3 : 1);
     },
-    [btn.mod, addHit, done]
+    [btn.mod, addHit, done, armed]
   );
 
   // Swallow keyboard activation so a focused button can't be Enter/Space-spammed.
@@ -186,9 +203,15 @@ export default function MasherFloor({ floorData, onAdvance }) {
       e.preventDefault();
       if (done) return;
       if (btn.mod === "runaway") {
+        // A brief pin that arms exactly one catch. Land it and the pin/arm
+        // drop and it repels away; miss for 500ms and the dodge re-arms.
         setFrozen(true);
+        setArmed(true);
         clearTimeout(freezeTimer.current);
-        freezeTimer.current = setTimeout(() => setFrozen(false), 1300);
+        freezeTimer.current = setTimeout(() => {
+          setFrozen(false);
+          setArmed(false);
+        }, 500);
       }
       setMenu({
         x: e.clientX,

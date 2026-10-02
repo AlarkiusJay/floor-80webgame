@@ -48,7 +48,7 @@ export default function IntroScreen({ onStart }) {
     return () => clearTimeout(t);
   }, [introDone]);
 
-  const warningText = "→ Get a pen and paper. Right now.\n→ Memory is not optional. It is required.\n→ 80 floors. No saves. No checkpoints.\n→ Some answers are hidden in the darkness.\n→ Look carefully. The obvious is rarely correct.";
+  const warningText = "→ Get a pen and paper. Right now.\n→ Memory is not optional. It is required.\n→ 80 floors. No saves. No checkpoints.\n→ Some floors are ciphers. Some hide a needle in plain sight.\n→ Look carefully. The obvious is rarely correct.";
   const { displayed, cursor } = useTypewriter(warningText, 65, 60000);
 
   if (!introDone) return <OpeningIntro onDone={() => setIntroDone(true)} />;
@@ -147,7 +147,7 @@ export default function IntroScreen({ onStart }) {
           </p>
           <ul className="text-xs text-foreground/50 font-mono-game leading-relaxed space-y-1">
             <li>→ Play with friends — take turns on each floor.</li>
-            <li>→ This game is streamer-friendly. Challenge your audience to spot the hidden text.</li>
+            <li>→ This game is streamer-friendly. Challenge your audience to crack the ciphers and count the needles.</li>
             <li>→ Write down answers — memory floors will test you later.</li>
           </ul>
         </motion.div>

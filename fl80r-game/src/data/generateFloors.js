@@ -1,4 +1,4 @@
-import { HIDDEN_RIDDLES, CHASE_RIDDLES } from "./riddleBank.js";
+import { CHASE_RIDDLES } from "./riddleBank.js";
 import { STORY_MATH_RIDDLES, CHAIN_SAFE_RIDDLES } from "./storyMathRiddles.js";
 import { LOGIC_RIDDLES } from "./logicRiddles.js";
 import { CRYPTOGRAM_PHRASES } from "./cryptogramPhrases.js";
@@ -83,7 +83,6 @@ const CIRCUIT_FLOOR_POSITIONS = new Set([9, 19, 29, 39, 49, 59, 69]);
 
 export function generateFloors() {
   // Shuffle riddle pools
-  const hiddenPool = shuffle(HIDDEN_RIDDLES);
   const chasePool  = shuffle(CHASE_RIDDLES);
 
   const tierForFloor = (f) => (f <= 25 ? 1 : f <= 55 ? 2 : 3);
@@ -143,21 +142,22 @@ export function generateFloors() {
   };
   const mathIdxByTier = { 1: 0, 2: 0, 3: 0 };
 
-  let hiddenIdx = 0;
   let chaseIdx  = 0;
 
   // Collected answers (unused by the new memory chain, kept for possible refs)
   const floorAnswers = {}; // floorNum -> answer string
 
   // Decide floor type assignment for non-boss, non-memory floors.
-  // Pattern (repeating for each zone). Two of the old "hidden" (etching) slots
-  // are now "needle" perception floors — net perception density is unchanged,
-  // variety is up (per the roadmap's "needle replaces hidden etching").
-  // One old "hidden" (etching) slot becomes a "cryptogram" floor. It sits between
-  // math (offset 3) and chase (offset 5), so it never lands next to a "needle"
-  // perception floor (offsets 2 and 6) — both are visual-scanning skills and the
-  // roadmap bars them from stacking.
-  const PATTERN = ["hidden", "typed", "needle", "math", "cryptogram", "chase", "needle", "typed", "hidden"];
+  // Pattern (repeating for each zone). Hidden Etching is fully retired — it was a
+  // find-the-text hunt, not a puzzle — so its old slots are now real puzzle
+  // floors: two became "needle" perception floors, offset 0 is a "cryptogram",
+  // and offset 8 is "math". Note offset 8 is a circuit floor in every zone but the
+  // last (floors 9,19,…69 guard the bosses), so it only actually lands on floor
+  // 79; the real second slot is offset 0, which every zone keeps. Placement keeps
+  // the two "needle" perception floors (offsets 2, 6) from ever sitting next to a
+  // "cryptogram" (offsets 0, 4) — both are visual-scan skills the roadmap bars
+  // from stacking — and no two same-type floors are adjacent.
+  const PATTERN = ["cryptogram", "typed", "needle", "math", "cryptogram", "chase", "needle", "typed", "math"];
 
   const result = {};
 
@@ -319,21 +319,6 @@ export function generateFloors() {
         bg,
         nextFloor,
         tier: tierForFloor(f),
-      };
-
-    } else {
-      // hidden
-      const riddle = hiddenPool[hiddenIdx % hiddenPool.length];
-      hiddenIdx++;
-      result[f] = {
-        ...meta,
-        type: "hidden",
-        bg,
-        nextFloor,
-        description: riddle.description,
-        clue: riddle.clue,
-        hiddenText: riddle.hiddenText,
-        hiddenColor: riddle.hiddenColor,
       };
     }
   }

@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { generateFloors } from "@/data/generateFloors";
 import IntroScreen from "@/components/game/IntroScreen";
 import FloorHeader from "@/components/game/FloorHeader";
-import HiddenFloor from "@/components/game/HiddenFloor";
 import TypedFloor from "@/components/game/TypedFloor";
 import MathFloor from "@/components/game/MathFloor";
 import CatBossFloor from "@/components/game/CatBossFloor";
@@ -85,13 +84,6 @@ export default function Game() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.4 }}
           >
-            {floorData?.type === "hidden" && (
-              <HiddenFloor
-                floor={currentFloor}
-                floorData={floorData}
-                onAdvance={handleAdvance}
-              />
-            )}
             {floorData?.type === "typed" && (
               <TypedFloor
                 floor={currentFloor}

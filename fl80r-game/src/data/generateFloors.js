@@ -1,5 +1,6 @@
-import { TYPED_RIDDLES, HIDDEN_RIDDLES, CHASE_RIDDLES } from "./riddleBank.js";
+import { HIDDEN_RIDDLES, CHASE_RIDDLES } from "./riddleBank.js";
 import { STORY_MATH_RIDDLES, CHAIN_SAFE_RIDDLES } from "./storyMathRiddles.js";
+import { LOGIC_RIDDLES } from "./logicRiddles.js";
 import { clockAnswer } from "@/lib/answers.js";
 import { FLOORS as STATIC_FLOORS } from "./floors.js";
 
@@ -81,11 +82,19 @@ const CIRCUIT_FLOOR_POSITIONS = new Set([9, 19, 29, 39, 49, 59, 69]);
 
 export function generateFloors() {
   // Shuffle riddle pools
-  const typedPool  = shuffle(TYPED_RIDDLES);
   const hiddenPool = shuffle(HIDDEN_RIDDLES);
   const chasePool  = shuffle(CHASE_RIDDLES);
 
   const tierForFloor = (f) => (f <= 25 ? 1 : f <= 55 ? 2 : 3);
+
+  // Logic/riddle floors ("typed") draw from the tiered story-logic bank, each
+  // tier shuffled once per run so a single run rarely repeats a riddle.
+  const logicTiers = {
+    1: shuffle(LOGIC_RIDDLES.filter((r) => r.tier === 1)),
+    2: shuffle(LOGIC_RIDDLES.filter((r) => r.tier === 2)),
+    3: shuffle(LOGIC_RIDDLES.filter((r) => r.tier === 3)),
+  };
+  const logicIdxByTier = { 1: 0, 2: 0, 3: 0 };
 
   // Assign each memory chain a distinct chain-safe source riddle, preferring the
   // source floor's tier. Clock chains keep the carried minutes sane (<= 200).
@@ -123,7 +132,6 @@ export function generateFloors() {
   };
   const mathIdxByTier = { 1: 0, 2: 0, 3: 0 };
 
-  let typedIdx  = 0;
   let hiddenIdx = 0;
   let chaseIdx  = 0;
 
@@ -207,16 +215,20 @@ export function generateFloors() {
     const floorType = PATTERN[zoneOffset % PATTERN.length];
 
     if (floorType === "typed") {
-      const riddle = typedPool[typedIdx % typedPool.length];
-      typedIdx++;
+      const tier = tierForFloor(f);
+      const pool = logicTiers[tier];
+      const riddle = pool[logicIdxByTier[tier]++ % pool.length];
       result[f] = {
         ...meta,
         type: "typed",
         bg,
         nextFloor,
+        logic: true,
         description: riddle.description,
-        clue: riddle.clue,
+        clue: "Reason it out - enter a word or a number.",
+        hint: riddle.hint,
         answer: riddle.answer,
+        accepts: riddle.accepts,
       };
       floorAnswers[f] = riddle.answer;
 

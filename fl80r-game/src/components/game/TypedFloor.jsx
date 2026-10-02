@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { isCloseGuess } from "@/data/relatedWords";
+import { matchesAnswer } from "@/lib/answers";
 
 // Renders tally marks: groups of 5 (𝙸𝙸𝙸𝙸 with a cross on 5th)
 function renderTally(count) {
@@ -28,12 +29,16 @@ export default function TypedFloor({ floor, floorData, onAdvance }) {
     ? floorData.memoryAnswer
     : activeData.answer;
 
+  // accepts[] grading on the normal/riddle steps; memory recall has no accepts
+  // list, so it falls back to an exact match on the carried answer.
+  const activeAccepts = step === "memory" ? undefined : activeData.accepts;
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const normalized = input.trim().toLowerCase();
     const correct = activeAnswer.toLowerCase();
 
-    if (normalized === correct) {
+    if (matchesAnswer(input, activeAccepts, activeAnswer)) {
       if (step === "memory") {
         // Correct memory answer — unlock the second riddle
         setStatus("unlocked");
@@ -73,6 +78,18 @@ export default function TypedFloor({ floor, floorData, onAdvance }) {
       transition={{ duration: 0.6 }}
       className="max-w-2xl mx-auto px-4 py-8 space-y-8"
     >
+      {/* Logic riddle pill (normal step) */}
+      {step === "normal" && floorData.logic && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-primary glow-green font-mono-game text-xs tracking-widest uppercase border border-primary/30 rounded px-2 py-1">
+            ⌂ Logic Riddle
+          </span>
+          <span className="text-muted-foreground font-mono-game text-xs tracking-widest uppercase">
+            deduce it - no guessing
+          </span>
+        </div>
+      )}
+
       {/* Memory step badge */}
       {step === "memory" && (
         <div className="flex items-center gap-2">

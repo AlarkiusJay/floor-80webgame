@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { isCloseGuess } from "@/data/relatedWords";
 import { matchesAnswer } from "@/lib/answers";
+import { HINT_EVERY, HINT_STAGES, logicHint } from "@/lib/hints";
 
 // Renders tally marks: groups of 5 (𝙸𝙸𝙸𝙸 with a cross on 5th)
 function renderTally(count) {
@@ -32,6 +33,15 @@ export default function TypedFloor({ floor, floorData, onAdvance }) {
   // accepts[] grading on the normal/riddle steps; memory recall has no accepts
   // list, so it falls back to an exact match on the carried answer.
   const activeAccepts = step === "memory" ? undefined : activeData.accepts;
+
+  // Logic riddles get tiered hints instead of the flat answer fade-in.
+  const useTieredHints = step === "normal" && !!floorData.logic;
+  const hintStage = Math.min(HINT_STAGES, Math.floor(attempts / HINT_EVERY));
+  const hints = useTieredHints
+    ? Array.from({ length: hintStage }, (_, i) =>
+        logicHint(i + 1, { hint: floorData.hint, answer: activeAnswer })
+      ).filter(Boolean)
+    : [];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -182,13 +192,35 @@ export default function TypedFloor({ floor, floorData, onAdvance }) {
         )}
       </form>
 
-      {/* Invisible hint — fades in after 12 attempts */}
-      <p
-        className="font-mono-game text-xs text-primary transition-all duration-1000"
-        style={{ opacity: hintOpacity, userSelect: hintOpacity > 0 ? "text" : "none" }}
-      >
-        ↳ {activeAnswer}
-      </p>
+      {useTieredHints ? (
+        /* Logic riddles: a new hint every HINT_EVERY misses. Earlier ones stay
+           obscured; the last is readable and near the answer. */
+        <div className="space-y-1">
+          {hints.map((h, i) => (
+            <motion.p
+              key={i}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: h.obscured ? 0.55 : 0.9, y: 0 }}
+              transition={{ duration: 1 }}
+              className="font-mono-game text-xs text-primary whitespace-pre"
+              style={{
+                filter: h.obscured ? "blur(0.6px)" : undefined,
+                userSelect: h.obscured ? "none" : "text",
+              }}
+            >
+              ↳ hint {i + 1}: {h.text}
+            </motion.p>
+          ))}
+        </div>
+      ) : (
+        /* Other typed floors — answer fades in after 12 attempts */
+        <p
+          className="font-mono-game text-xs text-primary transition-all duration-1000"
+          style={{ opacity: hintOpacity, userSelect: hintOpacity > 0 ? "text" : "none" }}
+        >
+          ↳ {activeAnswer}
+        </p>
+      )}
 
       <p className="text-muted-foreground/30 text-xs font-mono-game">
         Attempts: {attempts}

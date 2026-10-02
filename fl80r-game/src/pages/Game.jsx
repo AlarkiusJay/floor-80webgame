@@ -12,6 +12,7 @@ import RickrollFloor from "@/components/game/RickrollFloor";
 import MasherFloor from "@/components/game/MasherFloor";
 import MemoryFloor from "@/components/game/MemoryFloor";
 import NeedleFloor from "@/components/game/NeedleFloor";
+import CryptogramFloor from "@/components/game/CryptogramFloor";
 import IntroMenu from "@/components/game/IntroMenu";
 import CircuitPuzzleFloor from "@/components/game/CircuitPuzzleFloor";
 import FinalFloor from "@/components/game/FinalFloor";
@@ -100,6 +101,13 @@ export default function Game() {
             )}
             {floorData?.type === "needle" && (
               <NeedleFloor
+                floor={currentFloor}
+                floorData={floorData}
+                onAdvance={handleAdvance}
+              />
+            )}
+            {floorData?.type === "cryptogram" && (
+              <CryptogramFloor
                 floor={currentFloor}
                 floorData={floorData}
                 onAdvance={handleAdvance}

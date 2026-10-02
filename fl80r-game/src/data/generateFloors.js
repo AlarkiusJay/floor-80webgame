@@ -1,6 +1,7 @@
 import { HIDDEN_RIDDLES, CHASE_RIDDLES } from "./riddleBank.js";
 import { STORY_MATH_RIDDLES, CHAIN_SAFE_RIDDLES } from "./storyMathRiddles.js";
 import { LOGIC_RIDDLES } from "./logicRiddles.js";
+import { CRYPTOGRAM_PHRASES } from "./cryptogramPhrases.js";
 import { clockAnswer } from "@/lib/answers.js";
 import { FLOORS as STATIC_FLOORS } from "./floors.js";
 
@@ -96,6 +97,16 @@ export function generateFloors() {
   };
   const logicIdxByTier = { 1: 0, 2: 0, 3: 0 };
 
+  // Cryptogram floors (Archives specialty) draw a phrase per tier; each tier
+  // shuffled once per run so a single climb rarely repeats a phrase. The cipher
+  // itself is rolled inside the component.
+  const cryptoTiers = {
+    1: shuffle(CRYPTOGRAM_PHRASES.filter((p) => p.tier === 1)),
+    2: shuffle(CRYPTOGRAM_PHRASES.filter((p) => p.tier === 2)),
+    3: shuffle(CRYPTOGRAM_PHRASES.filter((p) => p.tier === 3)),
+  };
+  const cryptoIdxByTier = { 1: 0, 2: 0, 3: 0 };
+
   // Assign each memory chain a distinct chain-safe source riddle, preferring the
   // source floor's tier. Clock chains keep the carried minutes sane (<= 200).
   const usedSourceIds = new Set();
@@ -142,7 +153,11 @@ export function generateFloors() {
   // Pattern (repeating for each zone). Two of the old "hidden" (etching) slots
   // are now "needle" perception floors — net perception density is unchanged,
   // variety is up (per the roadmap's "needle replaces hidden etching").
-  const PATTERN = ["hidden", "typed", "needle", "math", "hidden", "chase", "needle", "typed", "hidden"];
+  // One old "hidden" (etching) slot becomes a "cryptogram" floor. It sits between
+  // math (offset 3) and chase (offset 5), so it never lands next to a "needle"
+  // perception floor (offsets 2 and 6) — both are visual-scanning skills and the
+  // roadmap bars them from stacking.
+  const PATTERN = ["hidden", "typed", "needle", "math", "cryptogram", "chase", "needle", "typed", "hidden"];
 
   const result = {};
 
@@ -279,6 +294,21 @@ export function generateFloors() {
         chaseLabel: riddle.chaseLabel,
       };
       floorAnswers[f] = riddle.answer;
+
+    } else if (floorType === "cryptogram") {
+      // Substitution-cipher floor: pick a tier-appropriate phrase; the cipher is
+      // rolled in the component. Grading forgives spacing/punctuation.
+      const tier = tierForFloor(f);
+      const pool = cryptoTiers[tier];
+      const phrase = pool[cryptoIdxByTier[tier]++ % pool.length].text;
+      result[f] = {
+        ...meta,
+        type: "cryptogram",
+        bg,
+        nextFloor,
+        tier,
+        phrase,
+      };
 
     } else if (floorType === "needle") {
       // Perception floor: wall of look-alike glyphs, count the odd ones out.

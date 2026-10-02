@@ -2,30 +2,35 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ── Cryptogram floor (Type 5, Archives specialty) ──
-// A banked phrase is hidden under a substitution cipher. The player reads the
-// ciphertext and types back the plaintext. The puzzle is the SUBSTITUTION, not
-// the phrase, so the phrases are deliberately familiar (proverbs, idioms,
-// internet catchphrases).
+// A banked phrase is hidden under a cipher; the player types back the plaintext.
+// The puzzle is the ENCODING, not the phrase, so the phrases are deliberately
+// familiar (proverbs, idioms, internet catchphrases). Two variants:
 //
-// Vowel scaffold: the VOWELS are a fixed guide, never random — they map to the
-// QWERTY top row (A->Q, E->W, I->E, O->R, U->T) and Y always stays Y. That key
-// is shown on the floor, and each vowel is pre-filled beneath the ciphertext,
-// exactly like a half-solved cryptogram. Only the consonants are scrambled, so
-// the player always has a foothold to work from.
+//   "sub"      — letter substitution. Vowels are a fixed guide mapped to the
+//                QWERTY top row (A->Q, E->W, I->E, O->R, U->T), Y stays Y, and
+//                each vowel is pre-filled beneath the ciphertext like a half-
+//                solved cryptogram. Only the consonants are scrambled.
 //
-// No hard lock: after repeated misses the building also leaks consonant keys,
-// then eventually the whole answer fades in.
+//   "alphanum" — every letter is written as its position in the alphabet
+//                (A=1 … Z=26). The only guide is the alphabet count everyone
+//                already knows, plus the vowels' numbers. No scaffold — reading
+//                the numbers back into letters IS the work.
+//
+// No hard lock in either: after repeated misses the building leaks consonant
+// keys, then eventually the whole answer fades in.
 
 const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-// Fixed vowel map (plaintext -> cipher). Y is an intentional identity.
+// "sub" variant — fixed vowel map (plaintext -> cipher). Y is an intentional identity.
 const VOWEL_MAP = { A: "Q", E: "W", I: "E", O: "R", U: "T", Y: "Y" };
-// The cipher letters reserved as vowel images — a consonant can never land here.
 const VOWEL_IMAGES = new Set(Object.values(VOWEL_MAP));
-// Reverse, for decoding the scaffold: cipher letter -> plaintext vowel.
 const CIPHER_TO_VOWEL = Object.fromEntries(
   Object.entries(VOWEL_MAP).map(([plain, cip]) => [cip, plain])
 );
+
+// "alphanum" variant — the vowels' number counterparts (A=1 … Z=26).
+const VOWEL_NUM = { A: 1, E: 5, I: 9, O: 15, U: 21, Y: 25 };
+const numOf = (ch) => ch.charCodeAt(0) - 64; // 'A' -> 1 … 'Z' -> 26
 
 function shuffle(arr) {
   const a = [...arr];
@@ -54,14 +59,12 @@ function makeCipher() {
 // so punctuation and spacing are always forgiven.
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-// A small, fixed worked example — its cipher obeys the same vowel key, so it
-// doubles as a demonstration of the guide (W=E, Q=A, R=O, Y=Y all visible).
-const EXAMPLE = { plain: "EASY COME EASY GO", cipher: "WQZY KRNW WQZY HR" };
+// Worked examples, one per variant — each obeys its own guide so it doubles as a
+// demonstration ("sub": W=E, Q=A, R=O, Y=Y; "alphanum": straight 1–26).
+const EXAMPLE_SUB = { plain: "EASY COME EASY GO", cipher: "WQZY KRNW WQZY HR" };
+const EXAMPLE_NUM = { plain: "CAT", nums: [3, 1, 20] };
 
-// Split a cipher/plain string into words of per-character cells for the two-row
-// display. For each cell: the cipher glyph on top, and beneath it the scaffold —
-// the decoded vowel (a "given"), a blank for an unknown consonant, or a passed-
-// through punctuation/space/digit.
+// ── "sub" two-row board: cipher glyph on top, decoded vowel / blank beneath ──
 function toCells(cipherText) {
   return cipherText.split(" ").map((word) =>
     word.split("").map((ch) => {
@@ -103,28 +106,61 @@ function CipherBoard({ cipher, dense }) {
   );
 }
 
+// ── "alphanum" board: each word a grouped run of alphabet-position numbers ──
+function NumBoard({ plain, dense }) {
+  const words = plain
+    .split(" ")
+    .map((w) => w.split("").map((ch) => (/[A-Z]/.test(ch) ? { num: numOf(ch) } : { lit: ch })));
+  return (
+    <div
+      className="inline-flex flex-wrap gap-x-3 gap-y-2 font-mono-game select-none"
+      style={{ fontSize: dense ? "clamp(13px, 3.2vw, 19px)" : "clamp(14px, 3.6vw, 22px)" }}
+    >
+      {words.map((word, wi) => (
+        <span
+          key={wi}
+          className="inline-flex gap-1.5 items-baseline rounded bg-white/5 px-2 py-1"
+          style={{ whiteSpace: "nowrap" }}
+        >
+          {word.map((cell, ci) =>
+            cell.num != null ? (
+              <span key={ci} className="text-primary/90 tabular-nums">{cell.num}</span>
+            ) : (
+              <span key={ci} className="text-muted-foreground">{cell.lit}</span>
+            )
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function CryptogramFloor({ floor, floorData, onAdvance }) {
+  const variant = floorData.variant === "alphanum" ? "alphanum" : "sub";
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("idle"); // idle | correct | wrong
   const [attempts, setAttempts] = useState(0);
 
-  // Roll the cipher + ciphertext once per mount (stable across re-renders; a page
-  // refresh regenerates the whole run, which re-rolls it).
+  // Build the encoding once per mount (stable across re-renders; a page refresh
+  // regenerates the whole run, which re-rolls it).
   const built = useRef(null);
   if (!built.current) {
     const plain = floorData.phrase;
-    const map = makeCipher();
-    const cipher = plain.split("").map((ch) => (map[ch] ? map[ch] : ch)).join("");
-
-    // Consonant footholds ranked by frequency — vowels are already given, so the
-    // assist only ever leaks the scrambled letters.
+    // Consonant footholds ranked by frequency — vowels are already a given in
+    // both variants, so the assist only ever leaks the parts you must work out.
     const freq = {};
-    for (const ch of plain) if (/[A-Z]/.test(ch) && !(ch in VOWEL_MAP)) freq[ch] = (freq[ch] || 0) + 1;
-    const footholds = Object.keys(freq)
-      .sort((a, b) => freq[b] - freq[a])
-      .map((p) => ({ cipher: map[p], plain: p }));
+    for (const ch of plain) if (/[A-Z]/.test(ch) && !(ch in VOWEL_NUM)) freq[ch] = (freq[ch] || 0) + 1;
+    const ranked = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
 
-    built.current = { plain, cipher, footholds };
+    if (variant === "alphanum") {
+      const footholds = ranked.map((p) => ({ cipher: String(numOf(p)), plain: p }));
+      built.current = { plain, cipher: null, footholds };
+    } else {
+      const map = makeCipher();
+      const cipher = plain.split("").map((ch) => (map[ch] ? map[ch] : ch)).join("");
+      const footholds = ranked.map((p) => ({ cipher: map[p], plain: p }));
+      built.current = { plain, cipher, footholds };
+    }
   }
   const { plain, cipher, footholds } = built.current;
 
@@ -147,6 +183,8 @@ export default function CryptogramFloor({ floor, floorData, onAdvance }) {
     setTimeout(() => setStatus("idle"), 1400);
   };
 
+  const isNum = variant === "alphanum";
+
   return (
     <motion.div
       key={floor}
@@ -161,50 +199,71 @@ export default function CryptogramFloor({ floor, floorData, onAdvance }) {
           ⧉ Cryptogram
         </span>
         <span className="text-muted-foreground font-mono-game text-xs tracking-widest uppercase">
-          decode the substitution
+          {isNum ? "AlphaNum — letters as 1–26" : "decode the substitution"}
         </span>
       </div>
 
       {/* Instruction */}
       <div className="terminal-border rounded-md p-5">
         <p className="text-foreground/90 font-mono-game text-sm leading-relaxed">
-          Every letter is swapped for another, the same swap throughout. The{" "}
-          <span className="text-accent">vowels are already given</span> — they never change (see
-          the key). Crack the consonants and type the phrase.
+          {isNum ? (
+            <>
+              Every letter is written as its spot in the alphabet —{" "}
+              <span className="text-accent">A=1, B=2 … Z=26</span>. You already know the count; the
+              vowels&apos; numbers are in the key. Read the numbers back into letters and type the
+              phrase.
+            </>
+          ) : (
+            <>
+              Every letter is swapped for another, the same swap throughout. The{" "}
+              <span className="text-accent">vowels are already given</span> — they never change (see
+              the key). Crack the consonants and type the phrase.
+            </>
+          )}
         </p>
       </div>
 
-      {/* Vowel key — the fixed guide */}
+      {/* Vowel key — the fixed guide, per variant */}
       <div className="rounded-md border border-accent/30 bg-accent/5 p-3">
         <p className="text-accent glow-amber font-mono-game text-[10px] tracking-widest uppercase mb-2">
-          ⚿ Vowel Key — always the same
+          {isNum ? "⚿ Vowel Key — alphabet numbers" : "⚿ Vowel Key — always the same"}
         </p>
         <div className="flex flex-wrap gap-2">
-          {Object.entries(VOWEL_MAP).map(([plain, cip]) => (
-            <span
-              key={plain}
-              className="font-mono-game text-sm text-accent border border-accent/30 rounded px-2 py-1"
-            >
-              {plain} = {cip}
-            </span>
-          ))}
+          {isNum
+            ? Object.entries(VOWEL_NUM).map(([ltr, n]) => (
+                <span key={ltr} className="font-mono-game text-sm text-accent border border-accent/30 rounded px-2 py-1">
+                  {ltr} = {n}
+                </span>
+              ))
+            : Object.entries(VOWEL_MAP).map(([ltr, cip]) => (
+                <span key={ltr} className="font-mono-game text-sm text-accent border border-accent/30 rounded px-2 py-1">
+                  {ltr} = {cip}
+                </span>
+              ))}
         </div>
       </div>
 
-      {/* Worked example — a solved cryptogram in the same two-row format */}
+      {/* Worked example — a solved one in the same format as the puzzle */}
       <div className="rounded-md border border-border/60 bg-black/20 p-3 space-y-1">
         <p className="text-muted-foreground font-mono-game text-[10px] tracking-widest uppercase">
-          ◇ example (solved) — cipher on top, answer beneath
+          {isNum ? "◇ example (solved) — numbers for letters" : "◇ example (solved) — cipher on top, answer beneath"}
         </p>
-        <CipherBoard cipher={EXAMPLE.cipher} dense />
-        <p className="font-mono-game text-[11px] text-primary/50 tracking-wide pt-1">
-          = {EXAMPLE.plain}
-        </p>
+        {isNum ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <NumBoard plain={EXAMPLE_NUM.plain} dense />
+            <span className="font-mono-game text-[11px] text-primary/50 tracking-wide">= {EXAMPLE_NUM.plain}</span>
+          </div>
+        ) : (
+          <>
+            <CipherBoard cipher={EXAMPLE_SUB.cipher} dense />
+            <p className="font-mono-game text-[11px] text-primary/50 tracking-wide pt-1">= {EXAMPLE_SUB.plain}</p>
+          </>
+        )}
       </div>
 
-      {/* The puzzle — vowels pre-filled, consonants blank */}
+      {/* The puzzle */}
       <div className="rounded-md border border-border bg-black/30 p-5 overflow-x-auto">
-        <CipherBoard cipher={cipher} />
+        {isNum ? <NumBoard plain={plain} /> : <CipherBoard cipher={cipher} />}
       </div>
 
       {/* Answer form */}
@@ -246,7 +305,7 @@ export default function CryptogramFloor({ floor, floorData, onAdvance }) {
           {status === "wrong" && (
             <motion.p key="wrong" initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="text-destructive font-mono-game text-sm">
-              ✗ Not the phrase. The swap holds.
+              ✗ Not the phrase. {isNum ? "Recount the letters." : "The swap holds."}
             </motion.p>
           )}
         </AnimatePresence>
@@ -260,10 +319,7 @@ export default function CryptogramFloor({ floor, floorData, onAdvance }) {
           </p>
           <div className="flex flex-wrap gap-2">
             {shownFootholds.map((f, i) => (
-              <span
-                key={i}
-                className="font-mono-game text-sm text-primary border border-primary/30 rounded px-2 py-1"
-              >
+              <span key={i} className="font-mono-game text-sm text-primary border border-primary/30 rounded px-2 py-1">
                 {f.cipher} = {f.plain}
               </span>
             ))}

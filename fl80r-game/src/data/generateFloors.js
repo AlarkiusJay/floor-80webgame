@@ -138,9 +138,11 @@ export function generateFloors() {
   // Collected answers (unused by the new memory chain, kept for possible refs)
   const floorAnswers = {}; // floorNum -> answer string
 
-  // Decide floor type assignment for non-boss, non-memory floors
-  // Pattern (repeating for each zone): hidden, typed, hidden, math, hidden, chase, hidden, typed, hidden
-  const PATTERN = ["hidden", "typed", "hidden", "math", "hidden", "chase", "hidden", "typed", "hidden"];
+  // Decide floor type assignment for non-boss, non-memory floors.
+  // Pattern (repeating for each zone). Two of the old "hidden" (etching) slots
+  // are now "needle" perception floors — net perception density is unchanged,
+  // variety is up (per the roadmap's "needle replaces hidden etching").
+  const PATTERN = ["hidden", "typed", "needle", "math", "hidden", "chase", "needle", "typed", "hidden"];
 
   const result = {};
 
@@ -277,6 +279,17 @@ export function generateFloors() {
         chaseLabel: riddle.chaseLabel,
       };
       floorAnswers[f] = riddle.answer;
+
+    } else if (floorType === "needle") {
+      // Perception floor: wall of look-alike glyphs, count the odd ones out.
+      // The wall + count are rolled inside the component; it only needs a tier.
+      result[f] = {
+        ...meta,
+        type: "needle",
+        bg,
+        nextFloor,
+        tier: tierForFloor(f),
+      };
 
     } else {
       // hidden

@@ -12,10 +12,16 @@ import { motion, AnimatePresence } from "framer-motion";
 // it won't trap you).
 
 // [base, needle] look-alike pairs per tier. The needle is the minority glyph.
+// Everything is UPPERCASE or a digit — never lowercase — so the only difference
+// is stroke shape, not case. Higher tiers use sneakier look-alikes; the nastiest
+// (1 vs I) lives in tier 3.
 const TIER_CFG = {
-  1: { rows: [3, 5],  cols: 14, perRow: [0.5, 1.1], pairs: [["O", "0"], ["o", "0"]] },
-  2: { rows: [6, 8],  cols: 18, perRow: [0.6, 1.2], pairs: [["O", "0"], ["I", "l"], ["1", "l"]] },
-  3: { rows: [9, 13], cols: 22, perRow: [0.7, 1.4], pairs: [["I", "l"], ["1", "l"], ["B", "8"], ["S", "5"], ["O", "0"]] },
+  1: { rows: [3, 5],  cols: 14, perRow: [0.5, 1.1],
+       pairs: [["O", "0"], ["E", "3"], ["S", "5"], ["B", "8"]] },
+  2: { rows: [6, 8],  cols: 18, perRow: [0.6, 1.2],
+       pairs: [["L", "I"], ["X", "Y"], ["V", "A"], ["Z", "2"], ["O", "0"]] },
+  3: { rows: [9, 13], cols: 22, perRow: [0.7, 1.4],
+       pairs: [["1", "I"], ["I", "L"], ["U", "V"], ["O", "Q"], ["G", "6"], ["O", "0"]] },
 };
 
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));

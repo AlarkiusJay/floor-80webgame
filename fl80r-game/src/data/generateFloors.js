@@ -99,16 +99,19 @@ export function generateFloors() {
   // Cryptogram floors (Archives specialty) draw a phrase per tier; each tier
   // shuffled once per run so a single climb rarely repeats a phrase. The cipher
   // itself is rolled inside the component.
+  //
+  // Variant is tiered, not random: tiers 1–2 use "alphanum" (A=1…Z=26) — the
+  // familiar, mechanical decode that keeps early floors approachable — and tier 3
+  // uses "sub" (letter-for-letter substitution), the real cryptanalysis, saved
+  // for the Glass Tower and up. Digit-bearing phrases (e.g. "404: NOT FOUND")
+  // would be ambiguous under alphanum, so they're kept out of the tier 1–2 pools.
+  const noDigits = (p) => !/[0-9]/.test(p.text);
   const cryptoTiers = {
-    1: shuffle(CRYPTOGRAM_PHRASES.filter((p) => p.tier === 1)),
-    2: shuffle(CRYPTOGRAM_PHRASES.filter((p) => p.tier === 2)),
+    1: shuffle(CRYPTOGRAM_PHRASES.filter((p) => p.tier === 1 && noDigits(p))),
+    2: shuffle(CRYPTOGRAM_PHRASES.filter((p) => p.tier === 2 && noDigits(p))),
     3: shuffle(CRYPTOGRAM_PHRASES.filter((p) => p.tier === 3)),
   };
   const cryptoIdxByTier = { 1: 0, 2: 0, 3: 0 };
-  // Alternate the two cryptogram variants ~50/50 across the run: "sub" (letter
-  // substitution) and "alphanum" (A=1…Z=26). Digit-bearing phrases can't be
-  // alphanum (the numbers would be ambiguous), so those fall back to "sub".
-  let cryptoVariantToggle = 0;
 
   // Assign each memory chain a distinct chain-safe source riddle, preferring the
   // source floor's tier. Clock chains keep the carried minutes sane (<= 200).
@@ -305,8 +308,7 @@ export function generateFloors() {
       const tier = tierForFloor(f);
       const pool = cryptoTiers[tier];
       const phrase = pool[cryptoIdxByTier[tier]++ % pool.length].text;
-      let variant = cryptoVariantToggle++ % 2 === 0 ? "sub" : "alphanum";
-      if (variant === "alphanum" && /[0-9]/.test(phrase)) variant = "sub";
+      const variant = tier === 3 ? "sub" : "alphanum";
       result[f] = {
         ...meta,
         type: "cryptogram",

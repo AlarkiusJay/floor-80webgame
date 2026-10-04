@@ -912,7 +912,7 @@ export const FLOORS = {
   80: {
     section: "Floor 80",
     sectionTitle: "⚠ THE FINAL FLOOR ⚠",
-    type: "final",
+    type: "cat", // CatMaze — the hardest maze; feeding the cat wins the game
     bg: "#010101",
   },
 };

@@ -5,7 +5,7 @@ import IntroScreen from "@/components/game/IntroScreen";
 import FloorHeader from "@/components/game/FloorHeader";
 import TypedFloor from "@/components/game/TypedFloor";
 import MathFloor from "@/components/game/MathFloor";
-import CatBossFloor from "@/components/game/CatBossFloor";
+import CatMazeFloor from "@/components/game/CatMazeFloor";
 import ChaseFloor from "@/components/game/ChaseFloor";
 import RickrollFloor from "@/components/game/RickrollFloor";
 import MasherFloor from "@/components/game/MasherFloor";
@@ -144,10 +144,12 @@ export default function Game() {
               />
             )}
             {floorData?.type === "cat" && (
-              <CatBossFloor
+              <CatMazeFloor
                 floor={currentFloor}
                 floorData={floorData}
+                isFinal={currentFloor === 80}
                 onAdvance={handleAdvance}
+                onWin={handleWin}
               />
             )}
             {floorData?.type === "final" && (

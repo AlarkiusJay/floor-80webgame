@@ -8,8 +8,9 @@ import { motion } from "framer-motion";
 // exactly like a newspaper cryptoquote. Two variants, one interaction:
 //
 //   "sub"      — letter substitution. The symbol under each blank is the cipher
-//                letter. Vowels are a fixed guide (A->Q, E->W, I->E, O->R, U->T,
-//                Y->Y) and come pre-filled + locked.
+//                letter. The Vowel Key (A->Q, E->W, I->E, O->R, U->T, Y->Y) is a
+//                fixed decoder the player APPLIES — vowels start blank. Instead,
+//                2-3 of the phrase's most common consonants are given to start.
 //   "alphanum" — every letter is its alphabet position (A=1 … Z=26). The symbol
 //                under each blank is that number; the vowels' numbers are given.
 //
@@ -59,17 +60,13 @@ export default function CryptogramFloor({ floor, floorData, onAdvance }) {
 
     const cells = []; // { type: "letter"|"space"|"punct", id?, symbol?, answer?, char? }
     const answerForSymbol = {};
-    const initialGuesses = {};
-    const vowelSymbols = new Set();
+    const freq = {}; // symbol -> how many blanks carry it (for picking common letters)
     plain.split("").forEach((ch, i) => {
       if (ch === " ") return cells.push({ type: "space" });
       if (!/[A-Z]/.test(ch)) return cells.push({ type: "punct", char: ch });
       const symbol = symbolOf(ch);
       answerForSymbol[symbol] = ch;
-      if (VOWELS.has(ch)) {
-        initialGuesses[symbol] = ch;
-        vowelSymbols.add(symbol);
-      }
+      freq[symbol] = (freq[symbol] || 0) + 1;
       cells.push({ type: "letter", id: i, symbol, answer: ch });
     });
 
@@ -80,19 +77,45 @@ export default function CryptogramFloor({ floor, floorData, onAdvance }) {
     });
     const distinctSymbols = [...new Set(letterIds.map((id) => byId[id].symbol))];
 
+    // Starting scaffold differs by variant:
+    //   alphanum — vowels are given (pre-filled + locked); the Vowel Key echoes them.
+    //   sub      — vowels start BLANK (player decodes them with the Vowel Key); instead
+    //              2-3 of the phrase's most common consonants are given as footholds.
+    const initialGuesses = {};
+    const startLocked = new Set();
+    if (isNum) {
+      distinctSymbols.forEach((s) => {
+        if (VOWELS.has(answerForSymbol[s])) {
+          initialGuesses[s] = answerForSymbol[s];
+          startLocked.add(s);
+        }
+      });
+    } else {
+      const ranked = distinctSymbols
+        .filter((s) => !VOWELS.has(answerForSymbol[s]))
+        .map((s) => ({ s, f: freq[s], r: Math.random() }))
+        .sort((a, b) => b.f - a.f || b.r - a.r) // most frequent first, random tiebreak
+        .map((o) => o.s);
+      const want = 2 + Math.floor(Math.random() * 2); // 2 or 3
+      ranked.slice(0, Math.min(want, ranked.length)).forEach((s) => {
+        initialGuesses[s] = answerForSymbol[s];
+        startLocked.add(s);
+      });
+    }
+
     model.current = {
       plain, cells, byId, letterIds, answerForSymbol, initialGuesses,
-      vowelSymbols, distinctSymbols,
+      startLocked, distinctSymbols,
     };
   }
   const M = model.current;
 
   const editableFor = (locked) => M.letterIds.filter((id) => !locked.has(M.byId[id].symbol));
-  const firstActive = editableFor(M.vowelSymbols)[0] ?? null;
+  const firstActive = editableFor(M.startLocked)[0] ?? null;
 
   // ── State + refs (refs let the global keydown handler read latest values) ──
   const [guesses, setGuessesState] = useState(M.initialGuesses);
-  const [locked, setLockedState] = useState(M.vowelSymbols);
+  const [locked, setLockedState] = useState(M.startLocked);
   const [activeId, setActiveIdState] = useState(firstActive);
   const [wrong, setWrong] = useState(new Set());
   const [status, setStatus] = useState("idle"); // idle | correct
@@ -300,15 +323,21 @@ export default function CryptogramFloor({ floor, floorData, onAdvance }) {
 
       {/* Instruction */}
       <div className="terminal-border rounded-md p-4">
-        <p className="text-foreground/90 font-mono-game text-sm leading-relaxed">
-          {isNum
-            ? "Each letter is its spot in the alphabet (A=1 … Z=26). "
-            : "Every letter is swapped for another, the same swap throughout. "}
-          Pick a blank, then tap a key — every blank with the same{" "}
-          {isNum ? "number" : "symbol"} fills together. The{" "}
-          <span className="text-accent">vowels are already placed</span>. On desktop you can type,
-          use ← →, and Backspace.
-        </p>
+        {isNum ? (
+          <p className="text-foreground/90 font-mono-game text-sm leading-relaxed">
+            Each letter is its spot in the alphabet (A=1 … Z=26). Pick a blank, then tap a key —
+            every blank with the same number fills together. The{" "}
+            <span className="text-accent">vowels are already placed</span>. On desktop you can type,
+            use ← →, and Backspace.
+          </p>
+        ) : (
+          <p className="text-foreground/90 font-mono-game text-sm leading-relaxed">
+            Every letter is swapped for another, the same swap throughout. A few{" "}
+            <span className="text-accent">consonants are filled in</span> to start — use the Vowel Key
+            below to crack the rest. Pick a blank, then tap a key; every blank with the same symbol
+            fills together. On desktop you can type, use ← →, and Backspace.
+          </p>
+        )}
       </div>
 
       {/* Vowel key */}

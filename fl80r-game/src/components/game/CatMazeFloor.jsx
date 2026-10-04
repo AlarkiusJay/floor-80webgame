@@ -77,6 +77,28 @@ function carveRoom(g, cols, rows) {
   return { cr, cc, roomKeys };
 }
 
+// Braid the maze: knock out a fraction of dead-ends to create loops, so there
+// are genuine alternate routes (a perfect maze has exactly one path anywhere).
+function braid(g, cols, rows, p = 0.45) {
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const cell = g[r][c];
+    const walls = ["N", "E", "S", "W"].filter((d) => cell[d]);
+    if (walls.length === 3 && Math.random() < p) { // dead-end
+      const cand = walls.filter((d) => {
+        const [dr, dc] = DELTA[d];
+        const nr = r + dr, nc = c + dc;
+        return nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      });
+      if (cand.length) {
+        const d = cand[Math.floor(Math.random() * cand.length)];
+        const [dr, dc] = DELTA[d];
+        cell[d] = false;
+        g[r + dr][c + dc][OPP[d]] = false;
+      }
+    }
+  }
+}
+
 function reachable(g, cols, rows, from, to) {
   const seen = new Set([key(from.r, from.c)]);
   const q = [from];
@@ -130,9 +152,19 @@ function CatSprite({ size, dim }) {
 }
 
 export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFinal }) {
-  // Maze dims scale a touch with the floor; final floor is the biggest.
+  // Maze dims scale with the floor; bigger on desktop for more pathways, smaller
+  // on phones so cells stay tappable. Chosen once per mount.
   const dims = useRef(
-    isFinal ? { cols: 15, rows: 13, lag: 7 } : floor >= 50 ? { cols: 13, rows: 11, lag: 6 } : { cols: 11, rows: 9, lag: 5 }
+    (() => {
+      const desktop = typeof window !== "undefined" && window.innerWidth >= 768;
+      const tier = isFinal ? "final" : floor >= 50 ? "mid" : "early";
+      const table = {
+        early: desktop ? { cols: 17, rows: 13, lag: 7 } : { cols: 11, rows: 9, lag: 5 },
+        mid: desktop ? { cols: 19, rows: 15, lag: 8 } : { cols: 13, rows: 11, lag: 6 },
+        final: desktop ? { cols: 23, rows: 17, lag: 10 } : { cols: 15, rows: 13, lag: 7 },
+      };
+      return table[tier];
+    })()
   );
   const { cols, rows, lag: LAG } = dims.current;
 
@@ -144,7 +176,8 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
     let grid, room, tries = 0;
     do {
       grid = genMaze(cols, rows);
-      room = carveRoom(grid, cols, rows);
+      braid(grid, cols, rows);          // add loops → multiple pathways
+      room = carveRoom(grid, cols, rows); // re-seals the room border after braiding
       tries++;
     } while (!reachable(grid, cols, rows, { r: 0, c: 0 }, { r: room.cr, c: room.cc }) && tries < 60);
     const bowl = { r: room.cr, c: room.cc };
@@ -226,8 +259,9 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
 
   const cx = (c) => ((c + 0.5) / cols) * 100;
   const cy = (r) => ((r + 0.5) / rows) * 100;
-  const spriteSize = `min(${86 / cols}vw, ${520 / cols}px)`;
-  const kibbleSize = `min(${150 / cols}vw, ${820 / cols}px)`;
+  const MAZE_W = 760; // desktop cap; mobile uses the vw term below
+  const spriteSize = `min(${92 / cols}vw, ${(MAZE_W * 0.95) / cols}px)`;
+  const kibbleSize = `min(${150 / cols}vw, ${(MAZE_W * 1.55) / cols}px)`;
 
   const wallCol = "hsl(158 40% 32%)";
   const wall = (on) => (on ? `2px solid ${wallCol}` : "2px solid transparent");
@@ -260,7 +294,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
         <div
           className="relative"
           style={{
-            width: "min(86vw, 520px)",
+            width: `min(92vw, ${MAZE_W}px)`,
             aspectRatio: `${cols} / ${rows}`,
             border: `2px solid ${wallCol}`,
             borderRadius: 6,

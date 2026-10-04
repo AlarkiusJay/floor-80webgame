@@ -100,21 +100,20 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   if (!build.current) {
     const grid = genMaze(cols, rows);
     const bowl = { r: Math.floor(rows / 2), c: Math.floor(cols / 2) };
-    // Hide the cat somewhere reachable, away from start and bowl.
-    let hide;
-    do {
-      hide = { r: Math.floor(Math.random() * rows), c: Math.floor(Math.random() * cols) };
-    } while ((hide.r === 0 && hide.c === 0) || (hide.r === bowl.r && hide.c === bowl.c) ||
-             Math.abs(hide.r - bowl.r) + Math.abs(hide.c - bowl.c) < 2);
-    build.current = { grid, bowl, hide };
+    // Cat spawns right next to the dog (an open neighbour of the start cell)
+    // and echo-trails from there — no hunt phase.
+    let catSpawn = { r: 0, c: 1 };
+    for (const [dir, dr, dc] of [["E", 0, 1], ["S", 1, 0]]) {
+      if (!grid[0][0][dir]) { catSpawn = { r: dr, c: dc }; break; }
+    }
+    build.current = { grid, bowl, catSpawn };
   }
-  const { grid, bowl, hide } = build.current;
+  const { grid, bowl, catSpawn } = build.current;
 
-  const [phase, setPhase] = useState("hunt"); // hunt | lead | won
+  const [phase, setPhase] = useState("lead"); // lead | won
   const [dog, setDog] = useState({ r: 0, c: 0 });
   const [path, setPath] = useState([{ r: 0, c: 0 }]);
   const [woofing, setWoofing] = useState(false);
-  const [shake, setShake] = useState(false);
 
   const phaseRef = useRef(phase);
   const dogRef = useRef(dog);
@@ -124,9 +123,12 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   dogRef.current = dog;
   pathRef.current = path;
 
-  // Cat trails the dog's exact path, LAG steps behind.
-  const catIdx = Math.max(0, path.length - 1 - LAG);
-  const cat = path[catIdx];
+  // Cat starts beside the dog, then trails its exact path LAG steps behind.
+  // Prepending the spawn means the cat walks spawn -> start -> the dog's route
+  // with no teleport.
+  const catTrail = [catSpawn, ...path];
+  const catIdx = Math.max(0, catTrail.length - 1 - LAG);
+  const cat = catTrail[catIdx];
 
   // Win when the echo reaches the bowl.
   useEffect(() => {
@@ -170,19 +172,9 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
     woofTimer.current = setTimeout(() => setWoofing(false), 650);
   };
 
-  const onCellTap = (r, c) => {
-    if (phaseRef.current !== "hunt") return;
-    if (r === hide.r && c === hide.c) {
-      setPhase("lead"); // cat trots over; now lead it home
-    } else {
-      setShake(true);
-      setTimeout(() => setShake(false), 350);
-    }
-  };
-
   // Path cells still ahead of the cat — the route the echo is about to walk.
   const upcoming = new Set();
-  for (let i = catIdx; i < path.length; i++) upcoming.add(key(path[i].r, path[i].c));
+  for (let i = catIdx; i < catTrail.length; i++) upcoming.add(key(catTrail[i].r, catTrail[i].c));
 
   const cx = (c) => ((c + 0.5) / cols) * 100;
   const cy = (r) => ((r + 0.5) / rows) * 100;
@@ -210,17 +202,13 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
 
         {/* Instruction */}
         <p className="font-mono-game text-[11px] sm:text-xs text-primary/70 tracking-wide text-center max-w-md leading-relaxed">
-          {phase === "hunt"
-            ? "Something in this maze is pretending to be furniture. It is not furniture. — tap the hidden cat."
-            : phase === "lead"
+          {phase === "lead"
             ? "You are the dog (WASD / arrows / d-pad). The cat walks your exact trail, a few steps behind — lead it to the food. Walk into a dead-end and it will too."
             : "The cat reached the food. It knew where it was the whole time. It was waiting to see if you did."}
         </p>
 
         {/* Maze */}
-        <motion.div
-          animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
-          transition={{ duration: 0.35 }}
+        <div
           className="relative"
           style={{
             width: "min(86vw, 520px)",
@@ -239,7 +227,6 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
             return (
               <div
                 key={key(cell.r, cell.c)}
-                onClick={() => onCellTap(cell.r, cell.c)}
                 style={{
                   boxSizing: "border-box",
                   borderTop: wall(cell.N),
@@ -247,7 +234,6 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
                   borderBottom: wall(cell.S),
                   borderLeft: wall(cell.W),
                   background: onPath ? "hsl(158 64% 50% / 0.10)" : "transparent",
-                  cursor: phase === "hunt" ? "pointer" : "default",
                 }}
               />
             );
@@ -267,30 +253,26 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
             </motion.div>
           </div>
 
-          {/* Cat — hides at its cell during the hunt, then echo-trails the dog */}
+          {/* Cat — echo-trails the dog, starting from beside it */}
           <div className="absolute pointer-events-none flex items-center justify-center"
             style={{
-              left: `${cx(phase === "hunt" ? hide.c : cat.c)}%`,
-              top: `${cy(phase === "hunt" ? hide.r : cat.r)}%`,
-              transform: "translate(-50%,-50%)",
+              left: `${cx(cat.c)}%`, top: `${cy(cat.r)}%`, transform: "translate(-50%,-50%)",
               width: `${100 / cols}%`, height: `${100 / rows}%`,
               transition: "left 0.14s linear, top 0.14s linear", zIndex: 3,
             }}>
-            <CatSprite size={spriteSize} dim={phase === "hunt"} />
+            <CatSprite size={spriteSize} />
           </div>
 
-          {/* Dog (lead phase only) */}
-          {phase !== "hunt" && (
-            <div className="absolute pointer-events-none flex items-center justify-center"
-              style={{
-                left: `${cx(dog.c)}%`, top: `${cy(dog.r)}%`, transform: "translate(-50%,-50%)",
-                width: `${100 / cols}%`, height: `${100 / rows}%`,
-                transition: "left 0.12s linear, top 0.12s linear", zIndex: 4,
-              }}>
-              <DogSprite woofing={woofing} size={spriteSize} />
-            </div>
-          )}
-        </motion.div>
+          {/* Dog — you */}
+          <div className="absolute pointer-events-none flex items-center justify-center"
+            style={{
+              left: `${cx(dog.c)}%`, top: `${cy(dog.r)}%`, transform: "translate(-50%,-50%)",
+              width: `${100 / cols}%`, height: `${100 / rows}%`,
+              transition: "left 0.12s linear, top 0.12s linear", zIndex: 4,
+            }}>
+            <DogSprite woofing={woofing} size={spriteSize} />
+          </div>
+        </div>
 
         {/* Controls (lead phase) */}
         <AnimatePresence>

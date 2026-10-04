@@ -51,6 +51,47 @@ function genMaze(cols, rows) {
 
 const key = (r, c) => `${r},${c}`;
 
+// Carve a Pac-Man-style 3x3 room at the maze centre: open interior, solid walls
+// all around except one gate at the top. The kibble sits in the middle cell.
+function carveRoom(g, cols, rows) {
+  const cr = Math.floor(rows / 2), cc = Math.floor(cols / 2);
+  const inRoom = (r, c) => r >= cr - 1 && r <= cr + 1 && c >= cc - 1 && c <= cc + 1;
+  const roomKeys = new Set();
+  for (let r = cr - 1; r <= cr + 1; r++) for (let c = cc - 1; c <= cc + 1; c++) roomKeys.add(key(r, c));
+  // open the interior
+  for (let r = cr - 1; r <= cr + 1; r++) for (let c = cc - 1; c <= cc + 1; c++) {
+    if (c + 1 <= cc + 1) { g[r][c].E = false; g[r][c + 1].W = false; }
+    if (r + 1 <= cr + 1) { g[r][c].S = false; g[r + 1][c].N = false; }
+  }
+  // seal the outer border, leaving one gate at top-centre
+  const gate = { r: cr - 1, c: cc, dir: "N" };
+  for (let r = cr - 1; r <= cr + 1; r++) for (let c = cc - 1; c <= cc + 1; c++) {
+    for (const [dir, [dr, dc]] of Object.entries(DELTA)) {
+      const nr = r + dr, nc = c + dc;
+      if (inRoom(nr, nc)) continue;
+      const open = r === gate.r && c === gate.c && dir === gate.dir;
+      g[r][c][dir] = !open;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) g[nr][nc][OPP[dir]] = !open;
+    }
+  }
+  return { cr, cc, roomKeys };
+}
+
+function reachable(g, cols, rows, from, to) {
+  const seen = new Set([key(from.r, from.c)]);
+  const q = [from];
+  while (q.length) {
+    const { r, c } = q.shift();
+    if (r === to.r && c === to.c) return true;
+    for (const [dir, [dr, dc]] of Object.entries(DELTA)) {
+      if (g[r][c][dir]) continue;
+      const nr = r + dr, nc = c + dc, k = key(nr, nc);
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !seen.has(k)) { seen.add(k); q.push({ r: nr, c: nc }); }
+    }
+  }
+  return false;
+}
+
 // Blink driver — holds the open frame, flashes the closed frame at natural gaps.
 function useBlink(frames) {
   const [closed, setClosed] = useState(false);
@@ -98,17 +139,24 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   // Built once per mount (a refresh re-rolls the whole run → fresh maze).
   const build = useRef(null);
   if (!build.current) {
-    const grid = genMaze(cols, rows);
-    const bowl = { r: Math.floor(rows / 2), c: Math.floor(cols / 2) };
+    // Generate the maze + centre room, re-rolling until the kibble is reachable
+    // from the dog's start (sealing the room can isolate it on a bad roll).
+    let grid, room, tries = 0;
+    do {
+      grid = genMaze(cols, rows);
+      room = carveRoom(grid, cols, rows);
+      tries++;
+    } while (!reachable(grid, cols, rows, { r: 0, c: 0 }, { r: room.cr, c: room.cc }) && tries < 60);
+    const bowl = { r: room.cr, c: room.cc };
     // Cat spawns right next to the dog (an open neighbour of the start cell)
     // and echo-trails from there — no hunt phase.
     let catSpawn = { r: 0, c: 1 };
     for (const [dir, dr, dc] of [["E", 0, 1], ["S", 1, 0]]) {
       if (!grid[0][0][dir]) { catSpawn = { r: dr, c: dc }; break; }
     }
-    build.current = { grid, bowl, catSpawn };
+    build.current = { grid, bowl, catSpawn, roomKeys: room.roomKeys };
   }
-  const { grid, bowl, catSpawn } = build.current;
+  const { grid, bowl, catSpawn, roomKeys } = build.current;
 
   const [phase, setPhase] = useState("lead"); // lead | won
   const [dog, setDog] = useState({ r: 0, c: 0 });
@@ -179,6 +227,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   const cx = (c) => ((c + 0.5) / cols) * 100;
   const cy = (r) => ((r + 0.5) / rows) * 100;
   const spriteSize = `min(${86 / cols}vw, ${520 / cols}px)`;
+  const kibbleSize = `min(${150 / cols}vw, ${820 / cols}px)`;
 
   const wallCol = "hsl(158 40% 32%)";
   const wall = (on) => (on ? `2px solid ${wallCol}` : "2px solid transparent");
@@ -233,23 +282,29 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
                   borderRight: wall(cell.E),
                   borderBottom: wall(cell.S),
                   borderLeft: wall(cell.W),
-                  background: onPath ? "hsl(158 64% 50% / 0.10)" : "transparent",
+                  background: roomKeys.has(key(cell.r, cell.c))
+                    ? "hsl(43 96% 56% / 0.07)"
+                    : onPath ? "hsl(158 64% 50% / 0.10)" : "transparent",
                 }}
               />
             );
           })}
 
-          {/* Food bowl (centre) */}
+          {/* Cat kibble — the goal, in the centre room */}
           <div className="absolute pointer-events-none flex items-center justify-center"
             style={{ left: `${cx(bowl.c)}%`, top: `${cy(bowl.r)}%`, transform: "translate(-50%,-50%)",
-              width: `${100 / cols}%`, height: `${100 / rows}%` }}>
+              width: `${100 / cols}%`, height: `${100 / rows}%`, zIndex: 2 }}>
             <motion.div
-              animate={{ scale: [1, 1.12, 1], opacity: [0.75, 1, 0.75] }}
-              transition={{ duration: 1.8, repeat: Infinity }}
-              style={{ width: "62%", height: "62%", borderRadius: "50%",
-                border: "2px solid hsl(43 96% 56%)", boxShadow: "0 0 10px hsl(43 96% 56% / 0.6)",
-                display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ width: "42%", height: "42%", borderRadius: "50%", background: "hsl(43 96% 56%)" }} />
+              animate={{ scale: [1, 1.06, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              style={{ flexShrink: 0, display: "flex" }}
+            >
+              <img
+                src="/catmaze/catkibble.png"
+                alt=""
+                draggable={false}
+                style={{ width: kibbleSize, flexShrink: 0, filter: "drop-shadow(0 0 8px hsl(43 96% 56% / 0.6))" }}
+              />
             </motion.div>
           </div>
 

@@ -286,7 +286,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   useEffect(() => {
     if (phase === "lead" && cat.r === bowl.r && cat.c === bowl.c) {
       setPhase("won");
-      setTimeout(() => (isFinal ? onWin() : onAdvance(floorData.nextFloor)), 1400);
+      setTimeout(() => (isFinal ? onWin() : onAdvance(floorData.nextFloor)), 2200);
     }
   }, [catIdx, phase]); // eslint-disable-line
 
@@ -568,13 +568,40 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
           )}
         </AnimatePresence>
 
-        {phase === "won" && (
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="font-vt323 text-3xl text-primary glow-green tracking-widest">
-            {isFinal ? "THE CAT IS FED — YOU ESCAPE" : "FED. THE DOOR OPENS."}
-          </motion.p>
-        )}
       </div>
+
+      {/* Win curtain — a beat before advancing so the floor doesn't snap away */}
+      <AnimatePresence>
+        {phase === "won" && (
+          <motion.div
+            key="wincurtain"
+            className="absolute inset-0 flex flex-col items-center justify-center text-center px-4"
+            style={{ zIndex: 60, background: "#05070a" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.1, ease: "easeInOut" }}
+          >
+            <motion.img
+              src={SPRITE.cat[0]}
+              alt=""
+              draggable={false}
+              initial={{ scale: 0, rotate: -8 }}
+              animate={{ scale: [0, 1.18, 1], rotate: [-8, 5, 0], y: [8, -14, 0] }}
+              transition={{ delay: 0.2, duration: 0.75 }}
+              style={{ width: "min(32vw, 150px)", filter: "drop-shadow(0 0 14px hsl(120 90% 50% / 0.6))" }}
+            />
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55, duration: 0.5 }}
+              className="mt-5 font-vt323 text-3xl text-primary glow-green tracking-widest"
+            >
+              {isFinal ? "THE CAT IS FED — YOU ESCAPE" : "FED. THE DOOR OPENS."}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

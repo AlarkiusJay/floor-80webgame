@@ -18,6 +18,7 @@ const BIRDS = {
   },
 };
 const WOOF_RADIUS = 2; // Chebyshev cell radius a woof scares birds within
+const BIRD_COUNT = 5;  // perching birds — it's a boss floor
 // The four flyover sprites are DIRECTIONAL poses (head points NE/SE/SW/NW),
 // not animation frames — a bird flies straight in its pose's direction.
 const FLYOVER_DIRS = [
@@ -27,7 +28,7 @@ const FLYOVER_DIRS = [
   { dx: -1, dy: -1, src: "/catmaze/birds/bird-flyover4.png" }, // NW (head top-left)
 ];
 const BIRD_POOP = "/catmaze/birds/bird-poop.png";
-const POOP_MS = 55000;      // poop lifespan before it fades
+const POOP_MS = 30000;      // poop lifespan before it fades
 const FLYOVER_MS = 2600;    // time a bird takes to cross the maze
 
 // ── CatMaze — the cat boss floors (10/20/30/40/50/60/70/80) ──
@@ -269,26 +270,27 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
     for (const [dir, dr, dc] of [["E", 0, 1], ["S", 1, 0]]) {
       if (!grid[0][0][dir]) { catSpawn = { r: dr, c: dc }; break; }
     }
-    // Two perching birds (L2): open non-room cells, spread apart and away from
-    // the dog/cat start, roughly between the start and the kibble.
+    // A flock of perching birds (L2): open non-room cells, spread apart and away
+    // from the dog/cat start. Alternating left/right-facing variants.
     const bad = new Set([key(0, 0), key(catSpawn.r, catSpawn.c), ...room.roomKeys]);
-    const pickBird = (exclude) => {
-      for (let t = 0; t < 400; t++) {
+    const pickBird = (chosen) => {
+      for (let t = 0; t < 800; t++) {
         const r = Math.floor(Math.random() * rows), c = Math.floor(Math.random() * cols);
         const k = key(r, c);
-        if (bad.has(k) || exclude.has(k)) continue;
-        if (Math.abs(r - 0) + Math.abs(c - 0) < 3) continue;            // not hugging the start
-        if (Math.abs(r - room.cr) + Math.abs(c - room.cc) < 2) continue; // not jammed on the gate
+        if (bad.has(k)) continue;
+        if (r + c < 3) continue;                                         // not hugging the start
+        if (Math.abs(r - room.cr) + Math.abs(c - room.cc) < 2) continue; // clear of the gate
+        if (chosen.some((o) => Math.abs(o.r - r) + Math.abs(o.c - c) < 3)) continue; // spread out
         return { r, c };
       }
-      return { r: room.cr - 2 < 0 ? 0 : room.cr - 2, c: room.cc };
+      return null;
     };
-    const b1 = pickBird(new Set());
-    const b2 = pickBird(new Set([key(b1.r, b1.c), ...Array.from({ length: 1 }, () => "")]));
-    const birds = [
-      { id: 0, variant: "L", r: b1.r, c: b1.c },
-      { id: 1, variant: "R", r: b2.r, c: b2.c },
-    ];
+    const birds = [];
+    for (let i = 0; i < BIRD_COUNT; i++) {
+      const cell = pickBird(birds);
+      if (!cell) break;
+      birds.push({ id: i, variant: i % 2 === 0 ? "L" : "R", r: cell.r, c: cell.c });
+    }
     build.current = { grid, bowl, catSpawn, roomKeys: room.roomKeys, birds };
   }
   const { grid, bowl, catSpawn, roomKeys, birds } = build.current;
@@ -298,12 +300,12 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   const [path, setPath] = useState([{ r: 0, c: 0 }]);
   const [woofing, setWoofing] = useState(false);
   const [meowPop, setMeowPop] = useState(0); // bumps to retrigger the cat's poke bounce
-  const [birdsGone, setBirdsGone] = useState([false, false]);
+  const [birdsGone, setBirdsGone] = useState(() => birds.map(() => false));
   const [catIdx, setCatIdx] = useState(0);
   const [poops, setPoops] = useState([]);       // {r,c,at} — blocks both, fades after POOP_MS
-  const [flyovers, setFlyovers] = useState([]);  // {id,row} — birds mid-flight
+  const [flyovers, setFlyovers] = useState([]);  // birds mid-flight
   const flyId = useRef(0);
-  const revenge = birdsGone[0] && birdsGone[1];
+  const revenge = birdsGone.length > 0 && birdsGone.every(Boolean);
 
   const phaseRef = useRef(phase);
   const dogRef = useRef(dog);
@@ -398,8 +400,8 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
           ? ps : [...ps, { r: drop.r, c: drop.c, at: Date.now() }]));
       }, FLYOVER_MS * 0.5);
     };
-    const t0 = setTimeout(launch, 1400);
-    const iv = setInterval(launch, 4800);
+    const t0 = setTimeout(launch, 1200);
+    const iv = setInterval(launch, 3600);
     return () => { alive = false; clearTimeout(t0); clearInterval(iv); };
   }, [revenge, phase]); // eslint-disable-line
 
@@ -500,7 +502,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
           {phase !== "lead"
             ? "The cat reached the food. It knew where it was the whole time. It was waiting to see if you did."
             : !revenge
-            ? "Two birds are blocking the cat. Bring the dog close and WOOF to scare them off — then lead the cat along your trail to the food."
+            ? `A flock of birds is blocking the cat (${birdsGone.filter((g) => !g).length} left). Bring the dog close and WOOF to scare them off — then lead the cat to the food.`
             : "Revenge! The birds are dive-bombing — their droppings block the path (yours and the cat's) until they fade. Lead the cat around the mess to the food."}
         </p>
 

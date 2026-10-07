@@ -5,6 +5,20 @@ import { playSfx } from "@/lib/music";
 const WOOF_SFX = "/audio/woof-vfx.mp3";
 const MEOW_SFX = "/audio/meow.mp3"; // easter egg: click the cat
 
+// Birds (L2). Bird 1 faces left, Bird 2 faces right. Each has idle-blink and
+// angry frame pairs. Flyover frames are the top-down flap for the revenge phase.
+const BIRDS = {
+  L: {
+    blink: ["/catmaze/birds/bird-L-blink1.png", "/catmaze/birds/bird-L-blink2.png"],
+    angry: ["/catmaze/birds/bird-L-angry1.png", "/catmaze/birds/bird-L-angry2.png"],
+  },
+  R: {
+    blink: ["/catmaze/birds/bird-R-blink1.png", "/catmaze/birds/bird-R-blink2.png"],
+    angry: ["/catmaze/birds/bird-R-angry1.png", "/catmaze/birds/bird-R-angry2.png"],
+  },
+};
+const WOOF_RADIUS = 2; // Chebyshev cell radius a woof scares birds within
+
 // ── CatMaze — the cat boss floors (10/20/30/40/50/60/70/80) ──
 // Two phases on a freshly generated maze:
 //   Phase 1 (HUNT) — one cell hides the cat (needle-dim). Find & tap it.
@@ -155,6 +169,13 @@ function CatSprite({ size, dim }) {
       filter: dim ? "none" : "drop-shadow(0 0 6px hsl(120 90% 50% / 0.5))" }} />;
 }
 
+function BirdSprite({ variant, angry, size }) {
+  const idle = useBlink(BIRDS[variant].blink);
+  const src = angry ? BIRDS[variant].angry[0] : idle;
+  return <img src={src} width={size} height={size} alt="" draggable={false}
+    style={{ filter: `drop-shadow(0 0 6px ${angry ? "hsl(0 80% 55% / 0.6)" : "hsl(120 90% 50% / 0.5)"})` }} />;
+}
+
 export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFinal }) {
   // Maze dims scale with the floor; bigger on desktop for more pathways, smaller
   // on phones so cells stay tappable. Chosen once per mount.
@@ -191,30 +212,75 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
     for (const [dir, dr, dc] of [["E", 0, 1], ["S", 1, 0]]) {
       if (!grid[0][0][dir]) { catSpawn = { r: dr, c: dc }; break; }
     }
-    build.current = { grid, bowl, catSpawn, roomKeys: room.roomKeys };
+    // Two perching birds (L2): open non-room cells, spread apart and away from
+    // the dog/cat start, roughly between the start and the kibble.
+    const bad = new Set([key(0, 0), key(catSpawn.r, catSpawn.c), ...room.roomKeys]);
+    const pickBird = (exclude) => {
+      for (let t = 0; t < 400; t++) {
+        const r = Math.floor(Math.random() * rows), c = Math.floor(Math.random() * cols);
+        const k = key(r, c);
+        if (bad.has(k) || exclude.has(k)) continue;
+        if (Math.abs(r - 0) + Math.abs(c - 0) < 3) continue;            // not hugging the start
+        if (Math.abs(r - room.cr) + Math.abs(c - room.cc) < 2) continue; // not jammed on the gate
+        return { r, c };
+      }
+      return { r: room.cr - 2 < 0 ? 0 : room.cr - 2, c: room.cc };
+    };
+    const b1 = pickBird(new Set());
+    const b2 = pickBird(new Set([key(b1.r, b1.c), ...Array.from({ length: 1 }, () => "")]));
+    const birds = [
+      { id: 0, variant: "L", r: b1.r, c: b1.c },
+      { id: 1, variant: "R", r: b2.r, c: b2.c },
+    ];
+    build.current = { grid, bowl, catSpawn, roomKeys: room.roomKeys, birds };
   }
-  const { grid, bowl, catSpawn, roomKeys } = build.current;
+  const { grid, bowl, catSpawn, roomKeys, birds } = build.current;
 
   const [phase, setPhase] = useState("lead"); // lead | won
   const [dog, setDog] = useState({ r: 0, c: 0 });
   const [path, setPath] = useState([{ r: 0, c: 0 }]);
   const [woofing, setWoofing] = useState(false);
   const [meowPop, setMeowPop] = useState(0); // bumps to retrigger the cat's poke bounce
+  const [birdsGone, setBirdsGone] = useState([false, false]);
+  const [catIdx, setCatIdx] = useState(0);
+  const revenge = birdsGone[0] && birdsGone[1];
 
   const phaseRef = useRef(phase);
   const dogRef = useRef(dog);
   const pathRef = useRef(path);
   const lastMove = useRef(0);
+  const blockedDogRef = useRef(new Set());
   phaseRef.current = phase;
   dogRef.current = dog;
   pathRef.current = path;
 
-  // Cat starts beside the dog, then trails its exact path LAG steps behind.
-  // Prepending the spawn means the cat walks spawn -> start -> the dog's route
-  // with no teleport.
-  const catTrail = [catSpawn, ...path];
-  const catIdx = Math.max(0, catTrail.length - 1 - LAG);
-  const cat = catTrail[catIdx];
+  // Cat trails the dog: index 0 = catSpawn, index i>=1 = path[i-1].
+  const catTrailAt = (i) => (i <= 0 ? catSpawn : (path[i - 1] ?? path[path.length - 1]));
+  const cat = catTrailAt(catIdx);
+
+  // Dog is blocked by poop only (birds block the cat, not you). L2b fills this.
+  const blockedDog = new Set();
+  blockedDogRef.current = blockedDog;
+
+  // Advance the cat monotonically toward its lagged target, stopping before the
+  // first blocked cell ahead (a perched bird, or poop in L2b). It never moves
+  // back, so a block appearing behind it is ignored; clearing a block ahead lets
+  // it catch up. Synced to the dog (recomputed when the path or birds change), so
+  // it keeps a fixed lag regardless of frame timing.
+  useEffect(() => {
+    const blocked = new Set();
+    birds.forEach((b, i) => { if (!birdsGone[i]) blocked.add(key(b.r, b.c)); });
+    const target = path.length - LAG;
+    setCatIdx((prev) => {
+      let i = Math.max(prev, 0);
+      while (i < target) {
+        const cell = path[i] ?? path[path.length - 1]; // catTrailAt(i + 1)
+        if (blocked.has(key(cell.r, cell.c))) break;
+        i++;
+      }
+      return i;
+    });
+  }, [path, birdsGone]); // eslint-disable-line
 
   // Win when the echo reaches the bowl.
   useEffect(() => {
@@ -222,7 +288,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       setPhase("won");
       setTimeout(() => (isFinal ? onWin() : onAdvance(floorData.nextFloor)), 1400);
     }
-  }, [cat.r, cat.c, phase]); // eslint-disable-line
+  }, [catIdx, phase]); // eslint-disable-line
 
   const step = useCallback((dir) => {
     if (phaseRef.current !== "lead") return;
@@ -232,6 +298,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
     if (cell[dir]) return; // wall
     const [dr, dc] = DELTA[dir];
     const np = { r: dogRef.current.r + dr, c: dogRef.current.c + dc };
+    if (blockedDogRef.current.has(key(np.r, np.c))) return; // poop blocks the dog
     lastMove.current = now;
     setDog(np);
     setPath((p) => [...p, np]);
@@ -257,11 +324,25 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
     clearTimeout(woofTimer.current);
     woofTimer.current = setTimeout(() => setWoofing(false), 900);
     playSfx(WOOF_SFX); // respects the Settings Sound-FX volume + mute
+    // Scare any perched bird within the ripple radius (phase 1).
+    setBirdsGone((prev) => {
+      if (prev[0] && prev[1]) return prev;
+      const d = dogRef.current;
+      let changed = false;
+      const next = prev.map((gone, i) => {
+        if (gone) return true;
+        const b = birds[i];
+        if (Math.max(Math.abs(b.r - d.r), Math.abs(b.c - d.c)) <= WOOF_RADIUS) { changed = true; return true; }
+        return gone;
+      });
+      return changed ? next : prev;
+    });
   };
 
   // Path cells still ahead of the cat — the route the echo is about to walk.
   const upcoming = new Set();
-  for (let i = catIdx; i < catTrail.length; i++) upcoming.add(key(catTrail[i].r, catTrail[i].c));
+  for (let i = catIdx; i <= path.length; i++) { const c = catTrailAt(i); upcoming.add(key(c.r, c.c)); }
+  const catNext = catTrailAt(catIdx + 1);
 
   const cx = (c) => ((c + 0.5) / cols) * 100;
   const cy = (r) => ((r + 0.5) / rows) * 100;
@@ -291,9 +372,11 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
 
         {/* Instruction */}
         <p className="font-mono-game text-[11px] sm:text-xs text-primary/70 tracking-wide text-center max-w-md leading-relaxed">
-          {phase === "lead"
-            ? "You are the dog (WASD / arrows / d-pad). The cat walks your exact trail, a few steps behind — lead it to the food. Walk into a dead-end and it will too."
-            : "The cat reached the food. It knew where it was the whole time. It was waiting to see if you did."}
+          {phase !== "lead"
+            ? "The cat reached the food. It knew where it was the whole time. It was waiting to see if you did."
+            : !revenge
+            ? "Two birds are blocking the cat. Bring the dog close and WOOF to scare them off — then lead the cat along your trail to the food."
+            : "Both birds are gone — lead the cat along your trail to the food. (The birds don't forget.)"}
         </p>
 
         {/* Maze */}
@@ -347,6 +430,34 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
               />
             </motion.div>
           </div>
+
+          {/* Perching birds (phase 1) — block the cat until woofed off */}
+          <AnimatePresence>
+            {birds.map((b, i) => (
+              !birdsGone[i] && (
+                <motion.div
+                  key={b.id}
+                  className="absolute pointer-events-none flex items-center justify-center"
+                  initial={false}
+                  exit={{ opacity: 0, y: -18, scale: 0.7 }}
+                  transition={{ duration: 0.4 }}
+                  style={{
+                    left: `${(b.c / cols) * 100}%`, top: `${(b.r / rows) * 100}%`,
+                    width: `${100 / cols}%`, height: `${100 / rows}%`, zIndex: 3,
+                  }}
+                >
+                  <BirdSprite
+                    variant={b.variant}
+                    angry={
+                      Math.max(Math.abs(b.r - dog.r), Math.abs(b.c - dog.c)) <= WOOF_RADIUS ||
+                      (catNext && catNext.r === b.r && catNext.c === b.c)
+                    }
+                    size={spriteSize}
+                  />
+                </motion.div>
+              )
+            ))}
+          </AnimatePresence>
 
           {/* Cat — echo-trails the dog. Click it for a cheeky meow (easter egg). */}
           <div className="absolute flex items-center justify-center"

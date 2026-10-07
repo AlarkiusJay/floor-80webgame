@@ -17,7 +17,7 @@ const BIRDS = {
     angry: ["/catmaze/birds/bird-R-angry1.png", "/catmaze/birds/bird-R-angry2.png"],
   },
 };
-const WOOF_RADIUS = 2; // Chebyshev cell radius a woof scares birds within
+const WOOF_RADIUS = 4; // scares birds in a 9x9 square around the dog (Chebyshev 4)
 const BIRD_COUNT = 5;  // perching birds — it's a boss floor
 // The four flyover sprites are DIRECTIONAL poses (head points NE/SE/SW/NW),
 // not animation frames — a bird flies straight in its pose's direction.
@@ -325,9 +325,12 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   const catTrailAt = (i) => (i <= 0 ? catSpawn : (path[i - 1] ?? path[path.length - 1]));
   const cat = catTrailAt(catIdx);
 
-  // Poop blocks BOTH. Dog can't step onto poop; the cat halts before it too.
+  // Perching birds AND poop block the path for BOTH. Dog can't step onto them;
+  // the cat halts before them too.
   const poopSet = new Set(poops.map((p) => key(p.r, p.c)));
-  blockedDogRef.current = poopSet;
+  const blockedDog = new Set(poopSet);
+  birds.forEach((b, i) => { if (!birdsGone[i]) blockedDog.add(key(b.r, b.c)); });
+  blockedDogRef.current = blockedDog;
   const catCellRef = useRef(cat); catCellRef.current = cat;
   const poopsRef = useRef(poops); poopsRef.current = poops;
 
@@ -458,7 +461,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
     playSfx(WOOF_SFX); // respects the Settings Sound-FX volume + mute
     // Scare any perched bird within the ripple radius (phase 1).
     setBirdsGone((prev) => {
-      if (prev[0] && prev[1]) return prev;
+      if (prev.every(Boolean)) return prev;
       const d = dogRef.current;
       let changed = false;
       const next = prev.map((gone, i) => {
@@ -507,7 +510,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
           {phase !== "lead"
             ? "The cat reached the food. It knew where it was the whole time. It was waiting to see if you did."
             : !revenge
-            ? `A flock of birds is blocking the cat (${birdsGone.filter((g) => !g).length} left). Bring the dog close and WOOF to scare them off — then lead the cat to the food.`
+            ? `A flock of birds is blocking the way (${birdsGone.filter((g) => !g).length} left). WOOF near them to scare them off — then lead the cat to the food.`
             : "Revenge! The birds are dive-bombing — their droppings block the path (yours and the cat's) until they fade. Lead the cat around the mess to the food."}
         </p>
 

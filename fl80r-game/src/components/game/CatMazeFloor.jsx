@@ -18,9 +18,13 @@ const BIRDS = {
   },
 };
 const WOOF_RADIUS = 2; // Chebyshev cell radius a woof scares birds within
-const FLYOVER_FRAMES = [
-  "/catmaze/birds/bird-flyover1.png", "/catmaze/birds/bird-flyover2.png",
-  "/catmaze/birds/bird-flyover3.png", "/catmaze/birds/bird-flyover4.png",
+// The four flyover sprites are DIRECTIONAL poses (head points NE/SE/SW/NW),
+// not animation frames — a bird flies straight in its pose's direction.
+const FLYOVER_DIRS = [
+  { dx: 1, dy: -1, src: "/catmaze/birds/bird-flyover1.png" }, // NE (head top-right)
+  { dx: 1, dy: 1, src: "/catmaze/birds/bird-flyover2.png" },  // SE (head bottom-right)
+  { dx: -1, dy: 1, src: "/catmaze/birds/bird-flyover3.png" }, // SW (head bottom-left)
+  { dx: -1, dy: -1, src: "/catmaze/birds/bird-flyover4.png" }, // NW (head top-left)
 ];
 const BIRD_POOP = "/catmaze/birds/bird-poop.png";
 const POOP_MS = 55000;      // poop lifespan before it fades
@@ -208,24 +212,20 @@ function BirdSprite({ variant, angry, size }) {
     style={{ filter: `drop-shadow(0 0 6px ${angry ? "hsl(0 80% 55% / 0.6)" : "hsl(120 90% 50% / 0.5)"})` }} />;
 }
 
-// A bird flying across the maze (top-down flap) during the revenge phase.
-function FlyoverBird({ row, cy, size, onDone }) {
-  const [f, setF] = useState(0);
-  useEffect(() => {
-    const iv = setInterval(() => setF((x) => (x + 1) % 4), 110);
-    return () => clearInterval(iv);
-  }, []);
+// A bird flying straight across the maze in its fixed directional pose (no
+// frame animation) during the revenge phase.
+function FlyoverBird({ fo, size, onDone }) {
   return (
     <motion.img
-      src={FLYOVER_FRAMES[f]}
+      src={fo.src}
       alt=""
       draggable={false}
-      initial={{ left: "-15%" }}
-      animate={{ left: "115%" }}
+      initial={{ left: `${fo.startX}%`, top: `${fo.startY}%` }}
+      animate={{ left: `${fo.endX}%`, top: `${fo.endY}%` }}
       transition={{ duration: FLYOVER_MS / 1000, ease: "linear" }}
       onAnimationComplete={onDone}
       style={{
-        position: "absolute", top: `${cy(row)}%`, transform: "translate(-50%,-50%)",
+        position: "absolute", transform: "translate(-50%,-50%)",
         width: size, zIndex: 8, pointerEvents: "none",
         filter: "drop-shadow(0 0 9px hsl(120 90% 50% / 0.5))",
       }}
@@ -381,13 +381,22 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       if (!alive) return;
       const drop = chooseDrop();
       if (!drop) return;
-      setFlyovers((fs) => [...fs, { id: ++flyId.current, row: drop.r }]);
-      const progress = (((drop.c + 0.5) / cols) * 100 + 15) / 130; // when the bird is over the cell
+      // Fly straight through the drop cell along one of the four pose directions;
+      // the drop cell is the midpoint, so the poop lands at t = 0.5.
+      const dir = FLYOVER_DIRS[Math.floor(Math.random() * FLYOVER_DIRS.length)];
+      const dropX = ((drop.c + 0.5) / cols) * 100;
+      const dropY = ((drop.r + 0.5) / rows) * 100;
+      const span = 150;
+      setFlyovers((fs) => [...fs, {
+        id: ++flyId.current, src: dir.src,
+        startX: dropX - dir.dx * span, startY: dropY - dir.dy * span,
+        endX: dropX + dir.dx * span, endY: dropY + dir.dy * span,
+      }]);
       setTimeout(() => {
         if (!alive) return;
         setPoops((ps) => (ps.some((q) => q.r === drop.r && q.c === drop.c)
           ? ps : [...ps, { r: drop.r, c: drop.c, at: Date.now() }]));
-      }, Math.max(250, progress * FLYOVER_MS));
+      }, FLYOVER_MS * 0.5);
     };
     const t0 = setTimeout(launch, 1400);
     const iv = setInterval(launch, 4800);
@@ -672,8 +681,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
           {flyovers.map((f) => (
             <FlyoverBird
               key={f.id}
-              row={f.row}
-              cy={cy}
+              fo={f}
               size={`min(${130 / cols}vw, ${(MAZE_W * 1.35) / cols}px)`}
               onDone={() => removeFlyover(f.id)}
             />

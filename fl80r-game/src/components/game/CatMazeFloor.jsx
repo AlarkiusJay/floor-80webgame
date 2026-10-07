@@ -264,21 +264,48 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       tries++;
     } while (!reachable(grid, cols, rows, { r: 0, c: 0 }, { r: room.cr, c: room.cc }) && tries < 60);
     const bowl = { r: room.cr, c: room.cc };
+
+    // Random dog start: a cell reachable from the kibble, out of the room and a
+    // fair distance from it, so the start varies run to run.
+    const reach = new Set([key(bowl.r, bowl.c)]);
+    const rq = [bowl];
+    while (rq.length) {
+      const { r, c } = rq.shift();
+      for (const [dir, [dr, dc]] of Object.entries(DELTA)) {
+        if (!grid[r][c][dir]) {
+          const nr = r + dr, nc = c + dc, k = key(nr, nc);
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !reach.has(k)) { reach.add(k); rq.push({ r: nr, c: nc }); }
+        }
+      }
+    }
+    const minStartDist = Math.max(4, Math.floor((cols + rows) / 4));
+    const startOpts = [];
+    for (const k of reach) {
+      const [r, c] = k.split(",").map(Number);
+      if (room.roomKeys.has(k)) continue;
+      if (Math.abs(r - bowl.r) + Math.abs(c - bowl.c) < minStartDist) continue;
+      startOpts.push({ r, c });
+    }
+    const start = startOpts.length ? startOpts[Math.floor(Math.random() * startOpts.length)] : { r: 0, c: 0 };
+
     // Cat spawns right next to the dog (an open neighbour of the start cell)
     // and echo-trails from there — no hunt phase.
-    let catSpawn = { r: 0, c: 1 };
-    for (const [dir, dr, dc] of [["E", 0, 1], ["S", 1, 0]]) {
-      if (!grid[0][0][dir]) { catSpawn = { r: dr, c: dc }; break; }
+    let catSpawn = start;
+    for (const [dir, [dr, dc]] of Object.entries(DELTA)) {
+      if (!grid[start.r][start.c][dir]) {
+        const nr = start.r + dr, nc = start.c + dc;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) { catSpawn = { r: nr, c: nc }; break; }
+      }
     }
     // A flock of perching birds (L2): open non-room cells, spread apart and away
     // from the dog/cat start. Collect every eligible cell, shuffle, then fill to
     // BIRD_COUNT greedily — a first pass prefers good spacing, a second pass tops
     // up so the full flock always spawns.
-    const bad = new Set([key(0, 0), key(catSpawn.r, catSpawn.c), ...room.roomKeys]);
+    const bad = new Set([key(start.r, start.c), key(catSpawn.r, catSpawn.c), ...room.roomKeys]);
     const eligible = [];
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       if (bad.has(key(r, c))) continue;
-      if (r + c < 3) continue;                                          // not hugging the start
+      if (Math.abs(r - start.r) + Math.abs(c - start.c) < 3) continue;  // not hugging the start
       if (Math.abs(r - room.cr) + Math.abs(c - room.cc) < 2) continue;  // clear of the gate
       eligible.push({ r, c });
     }
@@ -296,13 +323,13 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
     };
     fill(3); // nicely spread
     fill(1); // top up to the full count if the maze was tight
-    build.current = { grid, bowl, catSpawn, roomKeys: room.roomKeys, birds };
+    build.current = { grid, bowl, catSpawn, roomKeys: room.roomKeys, birds, start };
   }
-  const { grid, bowl, catSpawn, roomKeys, birds } = build.current;
+  const { grid, bowl, catSpawn, roomKeys, birds, start } = build.current;
 
   const [phase, setPhase] = useState("lead"); // lead | won
-  const [dog, setDog] = useState({ r: 0, c: 0 });
-  const [path, setPath] = useState([{ r: 0, c: 0 }]);
+  const [dog, setDog] = useState(start);
+  const [path, setPath] = useState([start]);
   const [woofing, setWoofing] = useState(false);
   const [meowPop, setMeowPop] = useState(0); // bumps to retrigger the cat's poke bounce
   const [birdsGone, setBirdsGone] = useState(() => birds.map(() => false));

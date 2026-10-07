@@ -271,26 +271,31 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       if (!grid[0][0][dir]) { catSpawn = { r: dr, c: dc }; break; }
     }
     // A flock of perching birds (L2): open non-room cells, spread apart and away
-    // from the dog/cat start. Alternating left/right-facing variants.
+    // from the dog/cat start. Collect every eligible cell, shuffle, then fill to
+    // BIRD_COUNT greedily — a first pass prefers good spacing, a second pass tops
+    // up so the full flock always spawns.
     const bad = new Set([key(0, 0), key(catSpawn.r, catSpawn.c), ...room.roomKeys]);
-    const pickBird = (chosen) => {
-      for (let t = 0; t < 800; t++) {
-        const r = Math.floor(Math.random() * rows), c = Math.floor(Math.random() * cols);
-        const k = key(r, c);
-        if (bad.has(k)) continue;
-        if (r + c < 3) continue;                                         // not hugging the start
-        if (Math.abs(r - room.cr) + Math.abs(c - room.cc) < 2) continue; // clear of the gate
-        if (chosen.some((o) => Math.abs(o.r - r) + Math.abs(o.c - c) < 3)) continue; // spread out
-        return { r, c };
-      }
-      return null;
-    };
-    const birds = [];
-    for (let i = 0; i < BIRD_COUNT; i++) {
-      const cell = pickBird(birds);
-      if (!cell) break;
-      birds.push({ id: i, variant: i % 2 === 0 ? "L" : "R", r: cell.r, c: cell.c });
+    const eligible = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (bad.has(key(r, c))) continue;
+      if (r + c < 3) continue;                                          // not hugging the start
+      if (Math.abs(r - room.cr) + Math.abs(c - room.cc) < 2) continue;  // clear of the gate
+      eligible.push({ r, c });
     }
+    for (let i = eligible.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+    }
+    const birds = [];
+    const fill = (minSpace) => {
+      for (const cell of eligible) {
+        if (birds.length >= BIRD_COUNT) break;
+        if (birds.some((o) => Math.abs(o.r - cell.r) + Math.abs(o.c - cell.c) < minSpace)) continue;
+        birds.push({ id: birds.length, variant: birds.length % 2 === 0 ? "L" : "R", r: cell.r, c: cell.c });
+      }
+    };
+    fill(3); // nicely spread
+    fill(1); // top up to the full count if the maze was tight
     build.current = { grid, bowl, catSpawn, roomKeys: room.roomKeys, birds };
   }
   const { grid, bowl, catSpawn, roomKeys, birds } = build.current;

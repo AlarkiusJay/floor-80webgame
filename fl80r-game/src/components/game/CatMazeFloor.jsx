@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { playSfx } from "@/lib/music";
 
 const WOOF_SFX = "/audio/woof-vfx.mp3";
+const MEOW_SFX = "/audio/meow.mp3"; // easter egg: click the cat
 
 // ── CatMaze — the cat boss floors (10/20/30/40/50/60/70/80) ──
 // Two phases on a freshly generated maze:
@@ -198,6 +199,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   const [dog, setDog] = useState({ r: 0, c: 0 });
   const [path, setPath] = useState([{ r: 0, c: 0 }]);
   const [woofing, setWoofing] = useState(false);
+  const [meowPop, setMeowPop] = useState(0); // bumps to retrigger the cat's poke bounce
 
   const phaseRef = useRef(phase);
   const dogRef = useRef(dog);
@@ -346,14 +348,24 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
             </motion.div>
           </div>
 
-          {/* Cat — echo-trails the dog, starting from beside it */}
-          <div className="absolute pointer-events-none flex items-center justify-center"
+          {/* Cat — echo-trails the dog. Click it for a cheeky meow (easter egg). */}
+          <div className="absolute flex items-center justify-center"
+            onClick={() => { playSfx(MEOW_SFX); setMeowPop((n) => n + 1); }}
+            title="meow?"
             style={{
               left: `${cx(cat.c)}%`, top: `${cy(cat.r)}%`, transform: "translate(-50%,-50%)",
               width: `${100 / cols}%`, height: `${100 / rows}%`,
               transition: "left 0.14s linear, top 0.14s linear", zIndex: 3,
+              cursor: "pointer",
             }}>
-            <CatSprite size={spriteSize} />
+            <motion.div
+              key={meowPop}
+              animate={meowPop ? { scale: [1, 1.28, 0.92, 1] } : {}}
+              transition={{ duration: 0.4 }}
+              style={{ display: "flex" }}
+            >
+              <CatSprite size={spriteSize} />
+            </motion.div>
           </div>
 
           {/* Dog — you */}

@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { isMuted } from "@/lib/music";
+
+const WOOF_SFX = "/audio/woof-vfx.mp3";
 
 // ── CatMaze — the cat boss floors (10/20/30/40/50/60/70/80) ──
 // Two phases on a freshly generated maze:
@@ -247,10 +250,22 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   }, [step]);
 
   const woofTimer = useRef(null);
+  const woofSfx = useRef(null);
   const doWoof = () => {
     setWoofing(true);
     clearTimeout(woofTimer.current);
-    woofTimer.current = setTimeout(() => setWoofing(false), 650);
+    woofTimer.current = setTimeout(() => setWoofing(false), 900);
+    // Bark sound — respects the Settings mute toggle.
+    try {
+      if (!isMuted()) {
+        if (!woofSfx.current) {
+          woofSfx.current = new Audio(WOOF_SFX);
+          woofSfx.current.volume = 0.55;
+        }
+        woofSfx.current.currentTime = 0;
+        woofSfx.current.play().catch(() => {});
+      }
+    } catch { /* ignore */ }
   };
 
   // Path cells still ahead of the cat — the route the echo is about to walk.
@@ -357,9 +372,51 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
             style={{
               left: `${cx(dog.c)}%`, top: `${cy(dog.r)}%`, transform: "translate(-50%,-50%)",
               width: `${100 / cols}%`, height: `${100 / rows}%`,
-              transition: "left 0.12s linear, top 0.12s linear", zIndex: 4,
+              transition: "left 0.12s linear, top 0.12s linear", zIndex: 5,
             }}>
             <DogSprite woofing={woofing} size={spriteSize} />
+
+            {/* Bark dialogue box — flips below the dog when it's on the top row */}
+            <AnimatePresence>
+              {woofing && (
+                <motion.div
+                  key="bark"
+                  initial={{ opacity: 0, scale: 0.5, y: dog.r <= 0 ? -6 : 6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.6, y: dog.r <= 0 ? -4 : 4 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 22 }}
+                  className="absolute"
+                  style={dog.r <= 0
+                    ? { top: "92%", left: "72%", zIndex: 6 }
+                    : { bottom: "92%", left: "72%", zIndex: 6 }}
+                >
+                  <div
+                    className="font-vt323 whitespace-nowrap"
+                    style={{
+                      position: "relative",
+                      fontSize: "clamp(16px, 3.4vw, 24px)",
+                      color: "hsl(43 96% 56%)",
+                      background: "hsl(20 14% 6%)",
+                      border: "2px solid hsl(43 96% 56%)",
+                      borderRadius: 8,
+                      padding: "2px 10px",
+                      letterSpacing: "0.08em",
+                      boxShadow: "0 0 10px hsl(43 96% 56% / 0.5)",
+                    }}
+                  >
+                    WOOF!
+                    {/* tail — points toward the dog */}
+                    <span style={dog.r <= 0
+                      ? { position: "absolute", left: "16%", bottom: "100%", width: 0, height: 0,
+                          borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+                          borderBottom: "7px solid hsl(43 96% 56%)" }
+                      : { position: "absolute", left: "16%", top: "100%", width: 0, height: 0,
+                          borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+                          borderTop: "7px solid hsl(43 96% 56%)" }} />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 

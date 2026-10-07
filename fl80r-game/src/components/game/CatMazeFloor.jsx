@@ -18,6 +18,13 @@ const BIRDS = {
   },
 };
 const WOOF_RADIUS = 2; // Chebyshev cell radius a woof scares birds within
+const FLYOVER_FRAMES = [
+  "/catmaze/birds/bird-flyover1.png", "/catmaze/birds/bird-flyover2.png",
+  "/catmaze/birds/bird-flyover3.png", "/catmaze/birds/bird-flyover4.png",
+];
+const BIRD_POOP = "/catmaze/birds/bird-poop.png";
+const POOP_MS = 55000;      // poop lifespan before it fades
+const FLYOVER_MS = 2600;    // time a bird takes to cross the maze
 
 // ── CatMaze — the cat boss floors (10/20/30/40/50/60/70/80) ──
 // Two phases on a freshly generated maze:
@@ -132,6 +139,31 @@ function reachable(g, cols, rows, from, to) {
   return false;
 }
 
+// Shortest path from -> to avoiding any cell in `blocked` (a Set of keys).
+// Returns an array of {r,c} (inclusive of both ends) or null.
+function bfsPath(g, cols, rows, from, to, blocked) {
+  const sk = key(from.r, from.c);
+  const prev = { [sk]: null };
+  const q = [from];
+  while (q.length) {
+    const { r, c } = q.shift();
+    if (r === to.r && c === to.c) {
+      const path = []; let cur = key(r, c);
+      while (cur) { const [pr, pc] = cur.split(",").map(Number); path.unshift({ r: pr, c: pc }); cur = prev[cur]; }
+      return path;
+    }
+    for (const [dir, [dr, dc]] of Object.entries(DELTA)) {
+      if (g[r][c][dir]) continue;
+      const nr = r + dr, nc = c + dc, k = key(nr, nc);
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+      if (blocked && blocked.has(k)) continue;
+      if (k in prev) continue;
+      prev[k] = key(r, c); q.push({ r: nr, c: nc });
+    }
+  }
+  return null;
+}
+
 // Blink driver — holds the open frame, flashes the closed frame at natural gaps.
 function useBlink(frames) {
   const [closed, setClosed] = useState(false);
@@ -174,6 +206,31 @@ function BirdSprite({ variant, angry, size }) {
   const src = angry ? BIRDS[variant].angry[0] : idle;
   return <img src={src} width={size} height={size} alt="" draggable={false}
     style={{ filter: `drop-shadow(0 0 6px ${angry ? "hsl(0 80% 55% / 0.6)" : "hsl(120 90% 50% / 0.5)"})` }} />;
+}
+
+// A bird flying across the maze (top-down flap) during the revenge phase.
+function FlyoverBird({ row, cy, size, onDone }) {
+  const [f, setF] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setF((x) => (x + 1) % 4), 110);
+    return () => clearInterval(iv);
+  }, []);
+  return (
+    <motion.img
+      src={FLYOVER_FRAMES[f]}
+      alt=""
+      draggable={false}
+      initial={{ left: "-15%" }}
+      animate={{ left: "115%" }}
+      transition={{ duration: FLYOVER_MS / 1000, ease: "linear" }}
+      onAnimationComplete={onDone}
+      style={{
+        position: "absolute", top: `${cy(row)}%`, transform: "translate(-50%,-50%)",
+        width: size, zIndex: 8, pointerEvents: "none",
+        filter: "drop-shadow(0 0 9px hsl(120 90% 50% / 0.5))",
+      }}
+    />
+  );
 }
 
 export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFinal }) {
@@ -243,6 +300,9 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   const [meowPop, setMeowPop] = useState(0); // bumps to retrigger the cat's poke bounce
   const [birdsGone, setBirdsGone] = useState([false, false]);
   const [catIdx, setCatIdx] = useState(0);
+  const [poops, setPoops] = useState([]);       // {r,c,at} — blocks both, fades after POOP_MS
+  const [flyovers, setFlyovers] = useState([]);  // {id,row} — birds mid-flight
+  const flyId = useRef(0);
   const revenge = birdsGone[0] && birdsGone[1];
 
   const phaseRef = useRef(phase);
@@ -258,18 +318,20 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   const catTrailAt = (i) => (i <= 0 ? catSpawn : (path[i - 1] ?? path[path.length - 1]));
   const cat = catTrailAt(catIdx);
 
-  // Dog is blocked by poop only (birds block the cat, not you). L2b fills this.
-  const blockedDog = new Set();
-  blockedDogRef.current = blockedDog;
+  // Poop blocks BOTH. Dog can't step onto poop; the cat halts before it too.
+  const poopSet = new Set(poops.map((p) => key(p.r, p.c)));
+  blockedDogRef.current = poopSet;
+  const catCellRef = useRef(cat); catCellRef.current = cat;
+  const poopsRef = useRef(poops); poopsRef.current = poops;
 
   // Advance the cat monotonically toward its lagged target, stopping before the
-  // first blocked cell ahead (a perched bird, or poop in L2b). It never moves
-  // back, so a block appearing behind it is ignored; clearing a block ahead lets
-  // it catch up. Synced to the dog (recomputed when the path or birds change), so
-  // it keeps a fixed lag regardless of frame timing.
+  // first blocked cell ahead (a perched bird or poop). It never moves back, so a
+  // block appearing behind it is ignored; clearing a block ahead lets it catch
+  // up. Synced to the dog, so it keeps a fixed lag regardless of frame timing.
   useEffect(() => {
     const blocked = new Set();
     birds.forEach((b, i) => { if (!birdsGone[i]) blocked.add(key(b.r, b.c)); });
+    poops.forEach((p) => blocked.add(key(p.r, p.c)));
     const target = path.length - LAG;
     setCatIdx((prev) => {
       let i = Math.max(prev, 0);
@@ -280,7 +342,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       }
       return i;
     });
-  }, [path, birdsGone]); // eslint-disable-line
+  }, [path, birdsGone, poops]); // eslint-disable-line
 
   // Win when the echo reaches the bowl.
   useEffect(() => {
@@ -289,6 +351,60 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       setTimeout(() => (isFinal ? onWin() : onAdvance(floorData.nextFloor)), 2200);
     }
   }, [catIdx, phase]); // eslint-disable-line
+
+  // Pick a cell to poop: on the dog's current route to the kibble, a little
+  // ahead of the dog, clear of the room and the cat, and never one that would
+  // seal the dog off from the kibble.
+  const chooseDrop = () => {
+    const start = dogRef.current;
+    const blocked = new Set(poopsRef.current.map((p) => key(p.r, p.c)));
+    const route = bfsPath(grid, cols, rows, start, bowl, blocked);
+    if (!route || route.length < 4) return null;
+    const catC = catCellRef.current;
+    const cands = route.slice(2).filter((c) =>
+      !roomKeys.has(key(c.r, c.c)) &&
+      !blocked.has(key(c.r, c.c)) &&
+      Math.max(Math.abs(c.r - catC.r), Math.abs(c.c - catC.c)) > 2
+    ).sort(() => Math.random() - 0.5);
+    for (const c of cands) {
+      const trial = new Set(blocked); trial.add(key(c.r, c.c));
+      if (bfsPath(grid, cols, rows, start, bowl, trial)) return c;
+    }
+    return null;
+  };
+
+  // Revenge: once both birds are woofed off, they fly over and bomb the route.
+  useEffect(() => {
+    if (!revenge || phase !== "lead") return;
+    let alive = true;
+    const launch = () => {
+      if (!alive) return;
+      const drop = chooseDrop();
+      if (!drop) return;
+      setFlyovers((fs) => [...fs, { id: ++flyId.current, row: drop.r }]);
+      const progress = (((drop.c + 0.5) / cols) * 100 + 15) / 130; // when the bird is over the cell
+      setTimeout(() => {
+        if (!alive) return;
+        setPoops((ps) => (ps.some((q) => q.r === drop.r && q.c === drop.c)
+          ? ps : [...ps, { r: drop.r, c: drop.c, at: Date.now() }]));
+      }, Math.max(250, progress * FLYOVER_MS));
+    };
+    const t0 = setTimeout(launch, 1400);
+    const iv = setInterval(launch, 4800);
+    return () => { alive = false; clearTimeout(t0); clearInterval(iv); };
+  }, [revenge, phase]); // eslint-disable-line
+
+  // Fade poop once it's older than POOP_MS.
+  useEffect(() => {
+    if (!poops.length) return;
+    const iv = setInterval(() => {
+      const now = Date.now();
+      setPoops((ps) => { const n = ps.filter((p) => now - p.at < POOP_MS); return n.length === ps.length ? ps : n; });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [poops.length]);
+
+  const removeFlyover = (id) => setFlyovers((fs) => fs.filter((f) => f.id !== id));
 
   const step = useCallback((dir) => {
     if (phaseRef.current !== "lead") return;
@@ -376,7 +492,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
             ? "The cat reached the food. It knew where it was the whole time. It was waiting to see if you did."
             : !revenge
             ? "Two birds are blocking the cat. Bring the dog close and WOOF to scare them off — then lead the cat along your trail to the food."
-            : "Both birds are gone — lead the cat along your trail to the food. (The birds don't forget.)"}
+            : "Revenge! The birds are dive-bombing — their droppings block the path (yours and the cat's) until they fade. Lead the cat around the mess to the food."}
         </p>
 
         {/* Maze */}
@@ -430,6 +546,27 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
               />
             </motion.div>
           </div>
+
+          {/* Bird poop (revenge) — blocks both dog and cat until it fades */}
+          <AnimatePresence>
+            {poops.map((p) => (
+              <motion.div
+                key={`${p.r},${p.c},${p.at}`}
+                className="absolute pointer-events-none flex items-center justify-center"
+                initial={{ opacity: 0, scale: 0.4 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={{ duration: 0.4 }}
+                style={{
+                  left: `${(p.c / cols) * 100}%`, top: `${(p.r / rows) * 100}%`,
+                  width: `${100 / cols}%`, height: `${100 / rows}%`, zIndex: 1,
+                }}
+              >
+                <img src={BIRD_POOP} alt="" draggable={false}
+                  style={{ width: "92%", filter: "drop-shadow(0 0 5px hsl(90 50% 75% / 0.5))" }} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
 
           {/* Perching birds (phase 1) — block the cat until woofed off */}
           <AnimatePresence>
@@ -530,6 +667,17 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
               )}
             </AnimatePresence>
           </div>
+
+          {/* Flyover birds (revenge) — cross the maze and drop poop */}
+          {flyovers.map((f) => (
+            <FlyoverBird
+              key={f.id}
+              row={f.row}
+              cy={cy}
+              size={`min(${130 / cols}vw, ${(MAZE_W * 1.35) / cols}px)`}
+              onDone={() => removeFlyover(f.id)}
+            />
+          ))}
         </div>
 
         {/* Controls (lead phase) */}

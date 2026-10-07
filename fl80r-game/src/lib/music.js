@@ -106,6 +106,47 @@ function clearGesture() {
   if (gestureCleanup) gestureCleanup();
 }
 
+// ── Sound effects (separate channel from the music theme) ─────────────────
+// Own volume + mute, persisted under their own keys so VFX and music are
+// controlled independently.
+const SFX_VOLUME_KEY = "fl80r_sfx_volume";
+const SFX_MUTE_KEY = "fl80r_sfx_muted";
+
+export function getSfxVolume() { // 0-100
+  try {
+    const v = localStorage.getItem(SFX_VOLUME_KEY);
+    return v !== null ? Number(v) : 70;
+  } catch {
+    return 70;
+  }
+}
+
+export function setSfxVolume(pct) {
+  try { localStorage.setItem(SFX_VOLUME_KEY, String(pct)); } catch { /* ignore */ }
+}
+
+export function isSfxMuted() {
+  try { return localStorage.getItem(SFX_MUTE_KEY) === "1"; } catch { return false; }
+}
+
+export function setSfxMuted(muted) {
+  try { localStorage.setItem(SFX_MUTE_KEY, muted ? "1" : "0"); } catch { /* ignore */ }
+}
+
+// Play a one-shot sound effect at the user's SFX volume (respects SFX mute).
+// Audio elements are cached per src so repeat plays are cheap.
+const sfxCache = {};
+export function playSfx(src) {
+  if (isSfxMuted()) return;
+  try {
+    let a = sfxCache[src];
+    if (!a) { a = new Audio(src); sfxCache[src] = a; }
+    a.volume = Math.max(0, Math.min(1, getSfxVolume() / 100));
+    a.currentTime = 0;
+    a.play().catch(() => {});
+  } catch { /* ignore */ }
+}
+
 // Stop the theme (e.g. when entering the actual game).
 export function stopTheme() {
   clearGesture();

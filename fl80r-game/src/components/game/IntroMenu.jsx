@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings, Cat, X, Coffee, Github, RotateCw, Volume2, VolumeX } from "lucide-react";
-import { setMusicVolume, isMuted, setMuted } from "@/lib/music";
+import {
+  setMusicVolume, isMuted, setMuted,
+  getSfxVolume, setSfxVolume, isSfxMuted, setSfxMuted, playSfx,
+} from "@/lib/music";
+
+const WOOF_SFX = "/audio/woof-vfx.mp3";
 
 const KOFI_URL = "https://ko-fi.com/alarkiusej/tiers";
 const ISSUES_URL = "https://github.com/AlarkiusJay/floor-80webgame/issues";
@@ -91,6 +96,21 @@ export default function IntroMenu({ variant = "intro" }) {
     setMutedState((m) => {
       const next = !m;
       setMuted(next);
+      return next;
+    });
+  }, []);
+
+  // Sound-FX volume + mute (own channel, persisted). playSfx reads these live.
+  const [sfxVolume, setSfxVolumeState] = useState(() => getSfxVolume());
+  useEffect(() => {
+    setSfxVolume(sfxVolume);
+  }, [sfxVolume]);
+  const [sfxMuted, setSfxMutedState] = useState(() => isSfxMuted());
+  const toggleSfxMute = useCallback(() => {
+    setSfxMutedState((m) => {
+      const next = !m;
+      setSfxMuted(next);
+      if (!next) playSfx(WOOF_SFX); // quick taste when turning it back on
       return next;
     });
   }, []);
@@ -219,6 +239,47 @@ export default function IntroMenu({ variant = "intro" }) {
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground/70 leading-relaxed">
                   🎵 Controls the main screen theme.
+                </p>
+              </div>
+
+              <div className="border-t border-border/40" />
+
+              {/* ── Sound FX ── */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label
+                    htmlFor="sfx-vol"
+                    className="text-xs text-foreground/70 tracking-widest uppercase"
+                  >
+                    Sound FX
+                  </label>
+                  <button
+                    onClick={toggleSfxMute}
+                    aria-label={sfxMuted ? "Unmute sound effects" : "Mute sound effects"}
+                    className="flex items-center gap-1.5 rounded border border-accent/30 bg-black/30 px-2 py-1 text-accent/80 hover:text-accent hover:border-accent/60 hover:bg-accent/5 transition-all text-[10px] tracking-widest uppercase"
+                  >
+                    {sfxMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                    {sfxMuted ? "Muted" : "On"}
+                  </button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="sfx-vol"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={sfxVolume}
+                    onChange={(e) => setSfxVolumeState(Number(e.target.value))}
+                    onPointerUp={() => !sfxMuted && playSfx(WOOF_SFX)}
+                    className="w-full cursor-pointer"
+                    style={{ accentColor: "hsl(43 96% 56%)" }}
+                  />
+                  <span className="text-xs text-accent tabular-nums w-9 text-right">
+                    {sfxVolume}%
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground/70 leading-relaxed">
+                  🔊 Woofs, barks & in-game sounds.
                 </p>
               </div>
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { isMuted } from "@/lib/music";
+import { playSfx } from "@/lib/music";
 
 const WOOF_SFX = "/audio/woof-vfx.mp3";
 
@@ -250,22 +250,11 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   }, [step]);
 
   const woofTimer = useRef(null);
-  const woofSfx = useRef(null);
   const doWoof = () => {
     setWoofing(true);
     clearTimeout(woofTimer.current);
     woofTimer.current = setTimeout(() => setWoofing(false), 900);
-    // Bark sound — respects the Settings mute toggle.
-    try {
-      if (!isMuted()) {
-        if (!woofSfx.current) {
-          woofSfx.current = new Audio(WOOF_SFX);
-          woofSfx.current.volume = 0.55;
-        }
-        woofSfx.current.currentTime = 0;
-        woofSfx.current.play().catch(() => {});
-      }
-    } catch { /* ignore */ }
+    playSfx(WOOF_SFX); // respects the Settings Sound-FX volume + mute
   };
 
   // Path cells still ahead of the cat — the route the echo is about to walk.

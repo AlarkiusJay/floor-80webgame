@@ -18,7 +18,6 @@ const BIRDS = {
   },
 };
 const WOOF_RADIUS = 4; // scares birds in a 9x9 square around the dog (Chebyshev 4)
-const BIRD_COUNT = 5;  // perching birds — it's a boss floor
 // The four flyover sprites are DIRECTIONAL poses (head points NE/SE/SW/NW),
 // not animation frames — a bird flies straight in its pose's direction.
 const FLYOVER_DIRS = [
@@ -242,14 +241,14 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       const desktop = typeof window !== "undefined" && window.innerWidth >= 768;
       const tier = isFinal ? "final" : floor >= 50 ? "mid" : "early";
       const table = {
-        early: desktop ? { cols: 17, rows: 13, lag: 7 } : { cols: 11, rows: 9, lag: 5 },
-        mid: desktop ? { cols: 19, rows: 15, lag: 8 } : { cols: 13, rows: 11, lag: 6 },
-        final: desktop ? { cols: 23, rows: 17, lag: 10 } : { cols: 15, rows: 13, lag: 7 },
+        early: desktop ? { cols: 17, rows: 13, lag: 7, birds: 9 } : { cols: 11, rows: 9, lag: 5, birds: 5 },
+        mid: desktop ? { cols: 19, rows: 15, lag: 8, birds: 12 } : { cols: 13, rows: 11, lag: 6, birds: 7 },
+        final: desktop ? { cols: 23, rows: 17, lag: 10, birds: 16 } : { cols: 15, rows: 13, lag: 7, birds: 9 },
       };
       return table[tier];
     })()
   );
-  const { cols, rows, lag: LAG } = dims.current;
+  const { cols, rows, lag: LAG, birds: BIRD_COUNT } = dims.current;
 
   // Built once per mount (a refresh re-rolls the whole run → fresh maze).
   const build = useRef(null);

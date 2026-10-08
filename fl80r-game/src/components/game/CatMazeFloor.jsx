@@ -312,12 +312,32 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       const j = Math.floor(Math.random() * (i + 1));
       [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
     }
+    // Each bird paces a short corridor (~3 cells) from its home, back and forth.
+    const routeFor = (home) => {
+      const route = [home];
+      let cur = home;
+      for (let s = 0; s < 3; s++) {
+        const opts = [];
+        for (const [dir, [dr, dc]] of Object.entries(DELTA)) {
+          if (grid[cur.r][cur.c][dir]) continue; // wall
+          const nr = cur.r + dr, nc = cur.c + dc, k = key(nr, nc);
+          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+          if (bad.has(k)) continue; // keep patrols out of the room / off the start
+          if (route.some((p) => p.r === nr && p.c === nc)) continue;
+          opts.push({ r: nr, c: nc });
+        }
+        if (!opts.length) break;
+        const next = opts[Math.floor(Math.random() * opts.length)];
+        route.push(next); cur = next;
+      }
+      return route;
+    };
     const birds = [];
     const fill = (minSpace) => {
       for (const cell of eligible) {
         if (birds.length >= BIRD_COUNT) break;
-        if (birds.some((o) => Math.abs(o.r - cell.r) + Math.abs(o.c - cell.c) < minSpace)) continue;
-        birds.push({ id: birds.length, variant: birds.length % 2 === 0 ? "L" : "R", r: cell.r, c: cell.c });
+        if (birds.some((b) => Math.abs(b.route[0].r - cell.r) + Math.abs(b.route[0].c - cell.c) < minSpace)) continue;
+        birds.push({ id: birds.length, route: routeFor(cell) });
       }
     };
     fill(3); // nicely spread
@@ -332,6 +352,10 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   const [woofing, setWoofing] = useState(false);
   const [meowPop, setMeowPop] = useState(0); // bumps to retrigger the cat's poke bounce
   const [birdsGone, setBirdsGone] = useState(() => birds.map(() => false));
+  const [birdNav, setBirdNav] = useState(() => birds.map((b) => ({
+    idx: 0, dir: 1,
+    facing: b.route[1] ? (b.route[1].c >= b.route[0].c ? "R" : "L") : "R",
+  })));
   const [catIdx, setCatIdx] = useState(0);
   const [poops, setPoops] = useState([]);       // {r,c,at} — blocks both, fades after POOP_MS
   const [flyovers, setFlyovers] = useState([]);  // birds mid-flight
@@ -343,9 +367,14 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   const pathRef = useRef(path);
   const lastMove = useRef(0);
   const blockedDogRef = useRef(new Set());
+  const birdsGoneRef = useRef(birdsGone); birdsGoneRef.current = birdsGone;
+  const birdNavRef = useRef(birdNav); birdNavRef.current = birdNav;
   phaseRef.current = phase;
   dogRef.current = dog;
   pathRef.current = path;
+
+  // Each patrolling bird's current cell (route position).
+  const birdCells = birds.map((b, k) => b.route[birdNav[k].idx]);
 
   // Cat trails the dog: index 0 = catSpawn, index i>=1 = path[i-1].
   const catTrailAt = (i) => (i <= 0 ? catSpawn : (path[i - 1] ?? path[path.length - 1]));
@@ -355,7 +384,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   // the cat halts before them too.
   const poopSet = new Set(poops.map((p) => key(p.r, p.c)));
   const blockedDog = new Set(poopSet);
-  birds.forEach((b, i) => { if (!birdsGone[i]) blockedDog.add(key(b.r, b.c)); });
+  birds.forEach((b, i) => { if (!birdsGone[i]) blockedDog.add(key(birdCells[i].r, birdCells[i].c)); });
   blockedDogRef.current = blockedDog;
   const catCellRef = useRef(cat); catCellRef.current = cat;
   const poopsRef = useRef(poops); poopsRef.current = poops;
@@ -366,7 +395,7 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
   // up. Synced to the dog, so it keeps a fixed lag regardless of frame timing.
   useEffect(() => {
     const blocked = new Set();
-    birds.forEach((b, i) => { if (!birdsGone[i]) blocked.add(key(b.r, b.c)); });
+    birds.forEach((b, i) => { if (!birdsGone[i]) { const p = b.route[birdNav[i].idx]; blocked.add(key(p.r, p.c)); } });
     poops.forEach((p) => blocked.add(key(p.r, p.c)));
     const target = path.length - LAG;
     setCatIdx((prev) => {
@@ -378,7 +407,25 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       }
       return i;
     });
-  }, [path, birdsGone, poops]); // eslint-disable-line
+  }, [path, birdsGone, poops, birdNav]); // eslint-disable-line
+
+  // Patrol: each surviving bird paces its route back and forth.
+  useEffect(() => {
+    if (phase !== "lead") return;
+    const iv = setInterval(() => {
+      setBirdNav((prev) => prev.map((nav, k) => {
+        if (birdsGoneRef.current[k]) return nav;
+        const route = birds[k].route;
+        if (route.length <= 1) return nav;
+        let { idx, dir } = nav;
+        let ni = idx + dir;
+        if (ni < 0 || ni >= route.length) { dir = -dir; ni = idx + dir; }
+        const facing = route[ni].c > route[idx].c ? "R" : route[ni].c < route[idx].c ? "L" : nav.facing;
+        return { idx: ni, dir, facing };
+      }));
+    }, 850);
+    return () => clearInterval(iv);
+  }, [phase]); // eslint-disable-line
 
   // Win when the echo reaches the bowl.
   useEffect(() => {
@@ -492,8 +539,8 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
       let changed = false;
       const next = prev.map((gone, i) => {
         if (gone) return true;
-        const b = birds[i];
-        if (Math.max(Math.abs(b.r - d.r), Math.abs(b.c - d.c)) <= WOOF_RADIUS) { changed = true; return true; }
+        const p = birds[i].route[birdNavRef.current[i].idx];
+        if (Math.max(Math.abs(p.r - d.r), Math.abs(p.c - d.c)) <= WOOF_RADIUS) { changed = true; return true; }
         return gone;
       });
       return changed ? next : prev;
@@ -613,32 +660,36 @@ export default function CatMazeFloor({ floor, floorData, onAdvance, onWin, isFin
             ))}
           </AnimatePresence>
 
-          {/* Perching birds (phase 1) — block the cat until woofed off */}
+          {/* Perching birds (phase 1) — patrol a short corridor, block, woof off */}
           <AnimatePresence>
-            {birds.map((b, i) => (
-              !birdsGone[i] && (
+            {birds.map((b, i) => {
+              if (birdsGone[i]) return null;
+              const pos = birdCells[i];
+              return (
                 <motion.div
                   key={b.id}
                   className="absolute pointer-events-none flex items-center justify-center"
                   initial={false}
+                  animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, y: -18, scale: 0.7 }}
-                  transition={{ duration: 0.4 }}
+                  transition={{ duration: 0.35 }}
                   style={{
-                    left: `${(b.c / cols) * 100}%`, top: `${(b.r / rows) * 100}%`,
+                    left: `${(pos.c / cols) * 100}%`, top: `${(pos.r / rows) * 100}%`,
                     width: `${100 / cols}%`, height: `${100 / rows}%`, zIndex: 3,
+                    transition: "left 0.35s linear, top 0.35s linear",
                   }}
                 >
                   <BirdSprite
-                    variant={b.variant}
+                    variant={birdNav[i].facing}
                     angry={
-                      Math.max(Math.abs(b.r - dog.r), Math.abs(b.c - dog.c)) <= WOOF_RADIUS ||
-                      (catNext && catNext.r === b.r && catNext.c === b.c)
+                      Math.max(Math.abs(pos.r - dog.r), Math.abs(pos.c - dog.c)) <= WOOF_RADIUS ||
+                      (catNext && catNext.r === pos.r && catNext.c === pos.c)
                     }
                     size={spriteSize}
                   />
                 </motion.div>
-              )
-            ))}
+              );
+            })}
           </AnimatePresence>
 
           {/* Cat — echo-trails the dog. Click it for a cheeky meow (easter egg). */}
